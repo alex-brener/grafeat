@@ -28,6 +28,11 @@ yarn-error.log*
 .env*.local
 .env
 
+# spike logs and temporary media (fixtures/ is committed, but redact before each commit)
+/logs
+/media
+
+
 # vercel
 .vercel
 
