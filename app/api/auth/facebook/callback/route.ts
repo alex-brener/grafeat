@@ -100,11 +100,25 @@ export async function GET(req: NextRequest) {
     pageIgLinks.push({ pageId: page.id, pageName: page.name, ...igJson });
   }
 
+  // Same reasoning as the Instagram Login callback: Meta's redirect only
+  // carries `code`, so reveal has to be an env var the user flips deliberately.
+  const reveal = process.env.DIAGNOSTIC_REVEAL_TOKENS === "true";
+
+  const safe = {
+    success: true,
+    tokenType: token?.token_type ?? null,
+    expiresInSeconds: token?.expires_in ?? null,
+    accessTokenLength: token?.access_token?.length ?? null,
+    accessTokenPrefix: token?.access_token ? token.access_token.slice(0, 4) : null,
+  };
+
   return NextResponse.json({
-    note: "Copy access_token into .env.local (never commit it) for later discovery/retrieval tests.",
+    note: reveal
+      ? "DIAGNOSTIC_REVEAL_TOKENS=true — raw token included below. Copy into env vars, then unset that flag and redeploy."
+      : "Token is not rendered by default. Set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel env vars, redeploy, and re-run this flow once to retrieve it.",
+    ...safe,
     pages: pages?.data,
     pageIgLinks,
-    rawAccessToken: token.access_token,
-    tokenMeta: { ...token, access_token: undefined },
+    ...(reveal ? { rawAccessToken: token.access_token } : {}),
   });
 }

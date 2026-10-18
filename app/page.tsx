@@ -9,6 +9,8 @@ const REQUIRED_ENV_VARS = [
 
 export default function DiagnosticPage() {
   const baseUrl = process.env.BASE_URL ?? "(BASE_URL not set)";
+  const organizerToken = process.env.ORGANIZER_ACCESS_TOKEN;
+  const organizerIgUserId = process.env.ORGANIZER_IG_USER_ID;
 
   return (
     <main>
@@ -22,6 +24,15 @@ export default function DiagnosticPage() {
             {key}: {process.env[key] ? "set" : "MISSING"}
           </li>
         ))}
+        <li>
+          ORGANIZER_IG_USER_ID: {organizerIgUserId ? organizerIgUserId : "MISSING"}
+        </li>
+        <li>
+          ORGANIZER_ACCESS_TOKEN:{" "}
+          {organizerToken
+            ? `present, length=${organizerToken.length}, prefix=${organizerToken.slice(0, 4)}…`
+            : "MISSING"}
+        </li>
       </ul>
 
       <h2>Auth (Section 1)</h2>

@@ -82,11 +82,29 @@ export async function GET(req: NextRequest) {
     latencyMs: Date.now() - longLivedStart,
   });
 
+  // Meta controls this redirect and only appends `code`/`error` — there's no
+  // way for us to receive a per-request reveal flag from the query string.
+  // Gate on an env var instead: set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel
+  // only while deliberately capturing a token, then unset it again.
+  const reveal = process.env.DIAGNOSTIC_REVEAL_TOKENS === "true";
+
+  const safe = {
+    success: true,
+    instagramUserId: shortLived?.user_id,
+    permissionsRequested: shortLived?.permissions ?? null,
+    tokenType: longLived?.token_type ?? null,
+    expiresInSeconds: longLived?.expires_in ?? null,
+    accessTokenLength: longLived?.access_token?.length ?? null,
+    accessTokenPrefix: longLived?.access_token ? longLived.access_token.slice(0, 4) : null,
+  };
+
   return NextResponse.json({
-    note: "Copy access_token into .env.local (never commit it) for later discovery/retrieval tests.",
-    shortLived: { ...shortLived, access_token: shortLived.access_token ? "(shown below only)" : undefined },
-    longLived,
-    rawShortLivedToken: shortLived.access_token,
-    rawLongLivedToken: longLived.access_token,
+    note: reveal
+      ? "DIAGNOSTIC_REVEAL_TOKENS=true — raw tokens included below. Copy into env vars, then unset that flag and redeploy."
+      : "Tokens are not rendered by default. Set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel env vars, redeploy, and re-run this flow once to retrieve them.",
+    ...safe,
+    ...(reveal
+      ? { rawShortLivedToken: shortLived.access_token, rawLongLivedToken: longLived.access_token }
+      : {}),
   });
 }
