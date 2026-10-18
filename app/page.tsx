@@ -57,6 +57,16 @@ export default function DiagnosticPage() {
         </li>
       </ul>
 
+      <h2>Meta app publication requirements</h2>
+      <ul>
+        <li>
+          <a href="/privacy">Privacy Policy</a>
+        </li>
+        <li>
+          <a href="/data-deletion">Data Deletion instructions</a>
+        </li>
+      </ul>
+
       <p>
         See <code>META-SETUP.md</code> for the Meta app configuration this depends on, and{" "}
         <code>SPIKE-RESULTS.md</code> for recorded outcomes.

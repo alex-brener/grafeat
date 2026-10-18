@@ -28,6 +28,12 @@ Status: **TODO — not yet created.** Fill in the `[ ]` items as you complete th
 - [ ] Verify token: matches `WEBHOOK_VERIFY_TOKEN` env var exactly
 - [ ] "Verify and Save" succeeded in the dashboard (requires the route above already deployed and live)
 
+## App publication prerequisite (needed before Meta allows webhook testing on some app configs)
+
+- [ ] Privacy Policy URL: `https://<production-domain>.vercel.app/privacy`
+- [ ] User Data Deletion URL: `https://<production-domain>.vercel.app/data-deletion`
+- Both registered in the app dashboard under App Settings → Basic
+
 ## Test accounts
 
 | Role | Handle | Account type (Business/Creator) | Facebook Page linked? | Added as Instagram Tester? |

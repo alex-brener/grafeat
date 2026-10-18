@@ -47,9 +47,29 @@ important fields, limitations, product implication.
 
 ### 3.2 Tag vs caption @mention
 
-- Status: not yet run
-- Different event/endpoint/data from 3.1?:
-- Recommendation (support captions, tags, or both):
+- Status: **`/tags` polling marked EXPERIMENTALLY UNRELIABLE / UNCONFIRMED** after two failed attempts — see tests A1/A2 and investigation below. `/tags` is secondary to our product (caption @mention is primary); not spending further budget on it beyond the cheap diagnostic listed below.
+
+**Test A1** — edited an *existing* post from a separate personal Instagram account, used Instagram's native "Tag people" UI to tag @the_calligrail (organizer). Polled `GET https://graph.instagram.com/v21.0/{organizer-ig-id}/tags` afterward — HTTP 200, `{"data":[]}`.
+
+**Test A2** — controlled for the retroactive-edit variable from A1: brand-new post, brand-new separate *Public* Personal Instagram account, audience "Everyone," tagged @the_calligrail via native "Tag people" UI *before publishing* (tag applied at publish time, not edited in). No caption @mention, no hashtags — isolated native-tag test. Polled the same endpoint after publish — HTTP 200, `{"data":[]}` again.
+
+- Different event/endpoint/data from 3.1?: not yet determined — webhook-based caption-mention test (3.1) not yet run
+- Recommendation (support captions, tags, or both): **lean toward captions as primary, per the product's original preferred model** — `/tags` polling has failed twice under documented-correct conditions (public account, tag-at-publish-time) with no error and no documented explanation. Final recommendation pending the 3.1 webhook test.
+- Implementation check: our request shape matches current official docs exactly — see verification below. This is not a bug in our code.
+
+#### Section 3.2 `/tags` investigation (documented findings, verified 2026-10-18)
+
+Re-checked against Meta's current reference pages (not relying on the earlier pass alone):
+
+- **Endpoint/host/permissions confirmed current and correct.** The IG User reference page's Requirements table lists, for Instagram API with Instagram Login: host `graph.instagram.com`, access token "Instagram User user access token," permission `instagram_business_basic`. The Instagram-Login "Mentions" doc additionally lists `instagram_business_manage_comments` for the `/tags` + `/mentions` pair. We have both granted. Our actual request — `GET https://graph.instagram.com/v21.0/{ig-user-id}/tags?fields=...&access_token=...` — matches this shape exactly.
+- **Access level confirmed not the blocker.** The Mentions doc distinguishes "Advanced Access if your app serves Instagram Professional accounts you don't own or manage" vs. Standard Access for accounts you do own/manage. The organizer account is ours, authenticated via its own OAuth grant, so Standard Access applies — no App Review/Advanced Access gap here.
+- **API version is current enough to trust the result.** We call `v21.0`. Current Graph API is `v26.0` (shipped 2026-07-29); `v21.0` deprecates 2027-01-21 but is not sunset yet — it still executes under its original contract. A deprecated-but-active version would be expected to error or warn, not silently return an empty array, so version staleness doesn't explain this. (Still worth bumping to a current version eventually — flagging as a non-blocking cleanup item, not changing it now per instruction not to make speculative changes.)
+- **"Private IG Media objects will not be returned"** is documented on the `/tags` reference page as the one explicit eligibility rule — ruled out directly by Test A2's setup (new public account, audience Everyone).
+- **No documented interaction between Instagram's own "Manually approve tags" privacy setting and the `/tags` API edge.** This is Instagram's native setting (Settings → Tags and mentions → Manually approve tags) that, when enabled, holds tags pending the tagged user's approval before they're attached/visible — normally described as a profile-display behavior, but Meta's API docs say nothing about whether a *pending* tag is excluded from `/tags` until approved. This is a real, undocumented gap, not an oversight on our side — and it is the most promising lead left.
+- No documented requirement that the tagging account be a Business/Creator (professional) account — ruled out as a cause by Test A2 design (personal account) producing the same result as everything else so far; not the discriminator here.
+- Pagination note (unrelated to the empty result but worth recording): the `/tags` edge supports cursor pagination but does not return `previous`/`next` fields.
+
+**Smallest next diagnostic (zero-cost, no new post, no code change):** open the Instagram app as @the_calligrail and check two things in one visit: (1) does the Test A2 post actually appear under the organizer's "Tagged"/"Photos of You" view at all? (2) is Settings → Tags and mentions → "Manually approve tags" turned on — and if so, is there a pending tag waiting for approval? If a pending tag exists, approve it and re-poll `/api/discovery/poll` immediately after. This single check cleanly separates "tag never attached" from "tag attached but gated behind an undocumented approval state" without any further posts or code changes.
 
 ### 3.3 Polling/reconciliation
 
