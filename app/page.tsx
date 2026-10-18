@@ -65,6 +65,9 @@ export default function DiagnosticPage() {
         <li>
           <a href="/data-deletion">Data Deletion instructions</a>
         </li>
+        <li>
+          <a href="/terms">Terms of Use</a>
+        </li>
       </ul>
 
       <p>

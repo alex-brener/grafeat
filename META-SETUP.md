@@ -32,7 +32,8 @@ Status: **TODO — not yet created.** Fill in the `[ ]` items as you complete th
 
 - [ ] Privacy Policy URL: `https://<production-domain>.vercel.app/privacy`
 - [ ] User Data Deletion URL: `https://<production-domain>.vercel.app/data-deletion`
-- Both registered in the app dashboard under App Settings → Basic
+- [ ] Terms of Use URL: `https://<production-domain>.vercel.app/terms`
+- All three registered in the app dashboard under App Settings → Basic
 
 ## Test accounts
 
