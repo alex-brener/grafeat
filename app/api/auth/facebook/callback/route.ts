@@ -76,8 +76,11 @@ export async function GET(req: NextRequest) {
   });
 
   // Step 2: list Facebook Pages this user manages, to test the Page dependency.
+  // Explicitly scope `fields` so Meta never sends back the per-page access_token
+  // it includes by default — we don't need it, and it's a real secret.
   const pagesStart = Date.now();
   const pagesUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/accounts`);
+  pagesUrl.searchParams.set("fields", "id,name,category,tasks");
   pagesUrl.searchParams.set("access_token", token.access_token);
   const pagesRes = await fetch(pagesUrl.toString());
   const pages = await pagesRes.json();
@@ -119,29 +122,31 @@ export async function GET(req: NextRequest) {
     });
 
     for (const business of (businesses as any)?.data ?? []) {
-      const ownedStart = Date.now();
-      const ownedUrl = new URL(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/${business.id}/owned_pages`
-      );
-      ownedUrl.searchParams.set("fields", "id,name,instagram_business_account");
-      ownedUrl.searchParams.set("access_token", token.access_token);
-      const ownedRes = await fetch(ownedUrl.toString());
-      const ownedJson = await ownedRes.json();
+      for (const edge of ["owned_pages", "client_pages"]) {
+        const ownedStart = Date.now();
+        const ownedUrl = new URL(
+          `https://graph.facebook.com/${GRAPH_API_VERSION}/${business.id}/${edge}`
+        );
+        ownedUrl.searchParams.set("fields", "id,name,instagram_business_account");
+        ownedUrl.searchParams.set("access_token", token.access_token);
+        const ownedRes = await fetch(ownedUrl.toString());
+        const ownedJson = await ownedRes.json();
 
-      await logEvent({
-        testCaseId: "auth.facebook_login.business_owned_pages",
-        endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/{business-id}/owned_pages`,
-        method: "GET",
-        apiVersion: GRAPH_API_VERSION,
-        params: { fields: "id,name,instagram_business_account" },
-        accountIds: { businessId: business.id },
-        status: ownedRes.status,
-        response: ownedJson,
-        result: ownedRes.ok ? "PASS" : "FAIL",
-        latencyMs: Date.now() - ownedStart,
-      });
+        await logEvent({
+          testCaseId: `auth.facebook_login.business_${edge}`,
+          endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/{business-id}/${edge}`,
+          method: "GET",
+          apiVersion: GRAPH_API_VERSION,
+          params: { fields: "id,name,instagram_business_account" },
+          accountIds: { businessId: business.id },
+          status: ownedRes.status,
+          response: ownedJson,
+          result: ownedRes.ok ? "PASS" : "FAIL",
+          latencyMs: Date.now() - ownedStart,
+        });
 
-      businessOwnedPages.push(...(ownedJson?.data ?? []));
+        businessOwnedPages.push(...(ownedJson?.data ?? []).map((p: any) => ({ ...p, _edge: edge })));
+      }
     }
   }
 
@@ -151,7 +156,7 @@ export async function GET(req: NextRequest) {
     pageId: page.id,
     pageName: page.name,
     instagram_business_account: page.instagram_business_account,
-    source: "business_owned_pages",
+    source: `business_${page._edge}`,
   }));
 
   for (const page of pages?.data ?? []) {
