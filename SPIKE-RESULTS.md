@@ -70,12 +70,22 @@ While reviewing a test response, `pages[0].access_token` (a genuine, usable Page
 
 ### 3.1 Caption mention
 
-- Status: **Test C (live webhook test): FAIL.** Documentation audit below was done first; this is the empirical follow-up.
-- Webhook delivered? **No.** Latency: n/a — no delivery observed within 5+ minutes of monitoring.
-- Payload fields present: n/a, nothing arrived.
+- Status: **Test C (Instagram Login webhook): FAIL. Test D (Facebook Login webhook): FAIL.** Both documented webhook paths now empirically tested for a pure caption-only mention, both negative.
+- Webhook delivered? **No, on either login path.** Latency: n/a — no delivery observed in either test.
+- Payload fields present: n/a, nothing arrived either time.
 - Media ID retrievable from payload?: n/a.
 - Full submission retrievable from the media ID?: n/a.
-- Fixture: none — nothing to save.
+- Fixture: none — nothing to save from either test.
+
+#### Test D — caption-mention-only post, Facebook Login webhook: FAIL (recorded 2026-10-20)
+
+**Setup:** same design as Test C for direct comparability — brand-new public feed post, separate Personal participant account, @the_calligrail in the caption only, no hashtags, no native tag, no collaborator.
+
+**App/webhook state at time of test:** Facebook Login OAuth fully working (Section 1b PASS), Page↔Instagram link confirmed via live API, Instagram webhook object's dedicated `mentions` field subscribed (separate subscription from Instagram Login's, same callback URL and verify token).
+
+**Result:** no new entries appeared in Vercel logs for `/api/webhooks/instagram` after publishing.
+
+**Conclusion:** this is the path with the most complete documentation — a dedicated `mentions` field, explicitly described as covering "a comment or caption on a media object" (Section 3.1 documentation audit above). It still did not deliver for a pure caption mention. Combined with Test C, **both login paths have now failed the same test under real, correctly-configured conditions.** This is a stronger, two-path-confirmed signal than either test alone — caption-only @mentions (no native tag, no hashtag) are not being delivered via webhook on either documented path, at least not within the observation window used. Not yet testing whether `mentioned_media` retrieval works at all when given a *known* media ID (decoupling "discovery" from "retrieval") — that's the next check, using a historical media ID already known to contain the mention rather than waiting on a new webhook.
 
 #### Test C — caption-mention-only post, Instagram Login webhook: FAIL (recorded 2026-10-19)
 

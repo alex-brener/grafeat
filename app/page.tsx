@@ -11,6 +11,7 @@ export default function DiagnosticPage() {
   const baseUrl = process.env.BASE_URL ?? "(BASE_URL not set)";
   const organizerToken = process.env.ORGANIZER_ACCESS_TOKEN;
   const organizerIgUserId = process.env.ORGANIZER_IG_USER_ID;
+  const facebookOrganizerToken = process.env.FACEBOOK_ORGANIZER_ACCESS_TOKEN;
 
   return (
     <main>
@@ -31,6 +32,12 @@ export default function DiagnosticPage() {
           ORGANIZER_ACCESS_TOKEN:{" "}
           {organizerToken
             ? `present, length=${organizerToken.length}, prefix=${organizerToken.slice(0, 4)}…`
+            : "MISSING"}
+        </li>
+        <li>
+          FACEBOOK_ORGANIZER_ACCESS_TOKEN:{" "}
+          {facebookOrganizerToken
+            ? `present, length=${facebookOrganizerToken.length}, prefix=${facebookOrganizerToken.slice(0, 4)}…`
             : "MISSING"}
         </li>
       </ul>
@@ -54,6 +61,11 @@ export default function DiagnosticPage() {
         </li>
         <li>
           <a href="/api/discovery/poll">Poll fallback (needs igUserId + accessToken query params, or ORGANIZER_IG_USER_ID / ORGANIZER_ACCESS_TOKEN env)</a>
+        </li>
+        <li>
+          <a href="/api/discovery/mentioned-media?mediaId=18105213724723381">
+            mentioned_media retrieval probe (Facebook Login) — defaults to a known historical #callivember media ID; pass ?mediaId= to override
+          </a>
         </li>
       </ul>
 
