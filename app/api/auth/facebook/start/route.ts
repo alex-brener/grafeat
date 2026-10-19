@@ -4,15 +4,17 @@ export const runtime = "nodejs";
 
 /**
  * Legacy "Facebook Login + Instagram Graph API" path — requires a Facebook
- * Page linked to the organizer's Instagram professional account. Re-verify
- * scope names against the live Facebook Login product page before testing.
+ * Page linked to the organizer's Instagram professional account.
+ *
+ * Uses Facebook Login for Business via a pre-created Configuration (config_id),
+ * not the classic scope= param — classic Facebook Login rejects instagram_basic/
+ * pages_show_list/pages_read_engagement outright ("Invalid Scopes"). The
+ * Configuration (General variant, User access token type) was created in the
+ * App Dashboard with instagram_basic, instagram_manage_comments, pages_show_list,
+ * pages_read_engagement selected. See SPIKE-RESULTS.md Section 1b for the full
+ * setup trail.
  */
-const SCOPES = [
-  "instagram_basic",
-  "instagram_manage_comments",
-  "pages_show_list",
-  "pages_read_engagement",
-].join(",");
+const FACEBOOK_LOGIN_CONFIG_ID = "1107651082267490";
 
 const GRAPH_API_VERSION = "v21.0";
 
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
   authorizeUrl.searchParams.set("client_id", appId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");
-  authorizeUrl.searchParams.set("scope", SCOPES);
+  authorizeUrl.searchParams.set("config_id", FACEBOOK_LOGIN_CONFIG_ID);
 
   return NextResponse.redirect(authorizeUrl.toString());
 }
