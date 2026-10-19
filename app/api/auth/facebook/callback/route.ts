@@ -93,8 +93,67 @@ export async function GET(req: NextRequest) {
     latencyMs: Date.now() - pagesStart,
   });
 
-  // Step 3: for each Page, check for a linked Instagram Business Account.
-  const pageIgLinks: unknown[] = [];
+  // Step 2.5 fallback: /me/accounts omits Pages owned by a Business Portfolio
+  // even with business_management granted (known Graph API behavior since
+  // v18 — see SPIKE-RESULTS.md Section 1b). If /me/accounts came back empty,
+  // list the user's businesses and pull each one's owned Pages directly,
+  // requesting instagram_business_account in the same call.
+  let businessOwnedPages: any[] = [];
+  let businesses: unknown = null;
+  if (!pages?.data?.length) {
+    const bizStart = Date.now();
+    const bizUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/businesses`);
+    bizUrl.searchParams.set("access_token", token.access_token);
+    const bizRes = await fetch(bizUrl.toString());
+    businesses = await bizRes.json();
+
+    await logEvent({
+      testCaseId: "auth.facebook_login.list_businesses",
+      endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/me/businesses`,
+      method: "GET",
+      apiVersion: GRAPH_API_VERSION,
+      status: bizRes.status,
+      response: businesses,
+      result: bizRes.ok ? "PASS" : "FAIL",
+      latencyMs: Date.now() - bizStart,
+    });
+
+    for (const business of (businesses as any)?.data ?? []) {
+      const ownedStart = Date.now();
+      const ownedUrl = new URL(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/${business.id}/owned_pages`
+      );
+      ownedUrl.searchParams.set("fields", "id,name,instagram_business_account");
+      ownedUrl.searchParams.set("access_token", token.access_token);
+      const ownedRes = await fetch(ownedUrl.toString());
+      const ownedJson = await ownedRes.json();
+
+      await logEvent({
+        testCaseId: "auth.facebook_login.business_owned_pages",
+        endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/{business-id}/owned_pages`,
+        method: "GET",
+        apiVersion: GRAPH_API_VERSION,
+        params: { fields: "id,name,instagram_business_account" },
+        accountIds: { businessId: business.id },
+        status: ownedRes.status,
+        response: ownedJson,
+        result: ownedRes.ok ? "PASS" : "FAIL",
+        latencyMs: Date.now() - ownedStart,
+      });
+
+      businessOwnedPages.push(...(ownedJson?.data ?? []));
+    }
+  }
+
+  // Step 3: for each Page from /me/accounts, check for a linked Instagram
+  // Business Account (owned_pages above already includes it inline).
+  const pageIgLinks: unknown[] = businessOwnedPages.map((page) => ({
+    pageId: page.id,
+    pageName: page.name,
+    instagram_business_account: page.instagram_business_account,
+    source: "business_owned_pages",
+  }));
+
   for (const page of pages?.data ?? []) {
     const igUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${page.id}`);
     igUrl.searchParams.set("fields", "instagram_business_account");
@@ -116,7 +175,7 @@ export async function GET(req: NextRequest) {
       latencyMs: Date.now() - igStart,
     });
 
-    pageIgLinks.push({ pageId: page.id, pageName: page.name, ...igJson });
+    pageIgLinks.push({ pageId: page.id, pageName: page.name, source: "me_accounts", ...igJson });
   }
 
   // Same reasoning as the Instagram Login callback: Meta's redirect only
@@ -138,6 +197,8 @@ export async function GET(req: NextRequest) {
     ...safe,
     grantedPermissions: permissions?.data,
     pages: pages?.data,
+    businesses: (businesses as any)?.data,
+    businessOwnedPages,
     pageIgLinks,
     ...(reveal ? { rawAccessToken: token.access_token } : {}),
   });
