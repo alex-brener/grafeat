@@ -22,7 +22,12 @@ const GRAPH_API_VERSION = "v21.0";
  * instagram_basic, instagram_manage_comments, pages_read_engagement.
  */
 export async function GET(req: NextRequest) {
-  const igUserId = req.nextUrl.searchParams.get("igUserId") ?? process.env.ORGANIZER_IG_USER_ID;
+  // Note: this is the Facebook-Graph-API-scoped IG user ID, a different
+  // value from ORGANIZER_IG_USER_ID (which is Instagram-Login-scoped — same
+  // underlying account, two different ID namespaces across Meta's two auth
+  // products). See SPIKE-RESULTS.md Section 3.1 for how this was discovered.
+  const igUserId =
+    req.nextUrl.searchParams.get("igUserId") ?? process.env.FACEBOOK_ORGANIZER_IG_USER_ID;
   const accessToken =
     req.nextUrl.searchParams.get("accessToken") ?? process.env.FACEBOOK_ORGANIZER_ACCESS_TOKEN;
   const mediaId = req.nextUrl.searchParams.get("mediaId");
