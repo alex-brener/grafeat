@@ -56,6 +56,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ step: "code_exchange", token }, { status: 502 });
   }
 
+  // Step 1.5: list permissions actually granted on this token — diagnostic for
+  // the empty-pages mystery (is pages_show_list genuinely granted or not?).
+  const permsStart = Date.now();
+  const permsUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/permissions`);
+  permsUrl.searchParams.set("access_token", token.access_token);
+  const permsRes = await fetch(permsUrl.toString());
+  const permissions = await permsRes.json();
+
+  await logEvent({
+    testCaseId: "auth.facebook_login.list_permissions",
+    endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/me/permissions`,
+    method: "GET",
+    apiVersion: GRAPH_API_VERSION,
+    status: permsRes.status,
+    response: permissions,
+    result: permsRes.ok ? "PASS" : "FAIL",
+    latencyMs: Date.now() - permsStart,
+  });
+
   // Step 2: list Facebook Pages this user manages, to test the Page dependency.
   const pagesStart = Date.now();
   const pagesUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/me/accounts`);
@@ -117,6 +136,7 @@ export async function GET(req: NextRequest) {
       ? "DIAGNOSTIC_REVEAL_TOKENS=true — raw token included below. Copy into env vars, then unset that flag and redeploy."
       : "Token is not rendered by default. Set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel env vars, redeploy, and re-run this flow once to retrieve it.",
     ...safe,
+    grantedPermissions: permissions?.data,
     pages: pages?.data,
     pageIgLinks,
     ...(reveal ? { rawAccessToken: token.access_token } : {}),
