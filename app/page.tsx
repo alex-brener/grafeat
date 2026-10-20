@@ -67,6 +67,10 @@ export default function DiagnosticPage() {
             mentioned_media retrieval probe (Facebook Login) — defaults to a known historical #callivember media ID; pass ?mediaId= to override
           </a>
         </li>
+        <li>
+          Test E hashtag search (Facebook Login) — <strong>no link here deliberately</strong>, rate-limited to 30 unique hashtags/7 days: visit{" "}
+          <code>/api/discovery/hashtag-search?hashtag=YOUR_TEST_HASHTAG</code> manually with a real hashtag.
+        </li>
       </ul>
 
       <h2>Meta app publication requirements</h2>

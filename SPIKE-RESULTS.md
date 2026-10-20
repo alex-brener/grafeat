@@ -70,7 +70,7 @@ While reviewing a test response, `pages[0].access_token` (a genuine, usable Page
 
 ### 3.1 Caption mention
 
-- Status: **Test C (Instagram Login webhook): FAIL. Test D (Facebook Login webhook): FAIL.** Both documented webhook paths now empirically tested for a pure caption-only mention, both negative.
+- Status: **Test C (Instagram Login webhook): FAIL. Test D (Facebook Login webhook): FAIL.** Both documented webhook paths now empirically tested for a pure caption-only mention, both negative. **Interpretation (corrected 2026-10-20): no confirmed DIRECT caption-mention discovery path under our current Standard Access configuration** — not "caption mentions don't work." This is a deliberate narrowing of the verdict, not new data: see the Standard Access investigation below, which surfaced a plausible alternative explanation that doesn't require caption mentions themselves to be non-functional. Test E (hashtag-based discovery, below) is testing whether a poll-based path can sidestep this question entirely.
 - Webhook delivered? **No, on either login path.** Latency: n/a — no delivery observed in either test.
 - Payload fields present: n/a, nothing arrived either time.
 - Media ID retrievable from payload?: n/a.
@@ -85,7 +85,15 @@ While reviewing a test response, `pages[0].access_token` (a genuine, usable Page
 
 **Result:** no new entries appeared in Vercel logs for `/api/webhooks/instagram` after publishing.
 
-**Conclusion:** this is the path with the most complete documentation — a dedicated `mentions` field, explicitly described as covering "a comment or caption on a media object" (Section 3.1 documentation audit above). It still did not deliver for a pure caption mention. Combined with Test C, **both login paths have now failed the same test under real, correctly-configured conditions.** This is a stronger, two-path-confirmed signal than either test alone — caption-only @mentions (no native tag, no hashtag) are not being delivered via webhook on either documented path, at least not within the observation window used.
+**Conclusion, narrowed (corrected 2026-10-20):** this is the path with the most complete documentation — a dedicated `mentions` field, explicitly described as covering "a comment or caption on a media object" (Section 3.1 documentation audit above). It still did not deliver for a pure caption mention. Combined with Test C, **both login paths have now failed the same test under real, correctly-configured conditions — but "correctly-configured" does not necessarily mean "Advanced Access."** See the Standard Access investigation immediately below: both tests used deliberately non-role-holder "arbitrary public" participant accounts (per the spike brief's own instruction, Section 2), and Meta's docs distinguish Standard Access (role-holder-triggered events only) from Advanced Access (events from arbitrary public users, requires App Review) specifically for webhook delivery. The original framing — "caption-only @mentions are not being delivered via webhook on either documented path" — is accurate as a description of these two test results, but should not be read as "the mechanism doesn't work"; it may simply mean these specific tests were never eligible for delivery under Standard Access, independent of the mention mechanism itself.
+
+#### Standard Access investigation for webhook delivery (2026-10-20)
+
+Investigated per the user's explicit request: could Test D's (and Test C's) null result be explained by Standard Access rather than a genuine caption-mention delivery failure? Found a direct, on-point statement in Meta's webhook access-level documentation: *"For receiving webhook notifications from Instagram, you need either Standard Access to receive notifications from people who have a role on your app (such as app admins, developers or testers), or Advanced Access to receive notifications from customers — people who do not have a role on your app. Advanced Access requires App Review."*
+
+This is a strong candidate explanation, not yet fully isolated as *the* cause: Tests A–D all used participant accounts deliberately **not** added as app roles (Instagram Testers / Admins / Developers), per the spike brief's own Section 2 instruction ("participant should not be an app administrator/developer/tester unless a test specifically requires it") — correct test design for simulating real usage, but if the Standard/Advanced distinction applies to webhook delivery exactly as stated, **Standard Access would never have delivered Test C or D's webhook regardless of whether the caption-mention mechanism itself works.** Notably, this is also consistent with Test A1's *different* result: `/tags` polling (an API read of the organizer's own account data) succeeded even though the tagging participant (`alexander.brener`) also had no app role — because reading your own account's data under Standard Access doesn't depend on the other party's role, only *receiving a push notification about their action* does. This asymmetry (polling worked, webhook didn't, for differently-sourced but comparably "non-role-holder-triggered" events) fits the Standard/Advanced distinction cleanly.
+
+**Not yet confirmed as the definitive cause** — this explains the null result as consistent with documented Meta access-control behavior, but doesn't yet prove it's the actual mechanism without a controlled test (e.g., repeating Test C or D with a participant account added as an Instagram Tester, to see if the webhook then fires). Recording as the leading hypothesis, not a closed finding. Does not change the Test C/D results themselves — only the interpretation of what they mean for the caption-mention mechanism's viability.
 
 #### `mentioned_media` retrieval test: PASS (recorded 2026-10-20)
 
@@ -95,7 +103,21 @@ Decoupled "does retrieval work" from "does discovery/webhook work" by calling `m
 
 **With the correct ID, the call succeeded (HTTP 200)** and returned the complete expected fields: `caption` (full text, correctly including "the_calligrail" in the Featured Artists list), `media_type: "CAROUSEL_ALBUM"`, `media_url` (a live, loadable CDN URL), `permalink`, `timestamp`, `username: "callivember"`, `comments_count: 86`, `like_count: 398`, `id`.
 
-**Product implication:** the retrieval half of the documented Facebook Login chain genuinely works — this is not a dead or broken edge. Combined with Tests C/D, the picture is now precise: **retrieval (`mentioned_media`) is confirmed working; discovery (webhook delivery for a new caption-only mention) is confirmed NOT working, on either login path, within the windows tested.** The missing piece is strictly the trigger, not the data. This directly informs `DECISION.md` question 2 ("what triggers ingestion") — caption-only mentions may need a different trigger mechanism (e.g. reconciliation polling against a reliably-updating source, if one can be found) rather than relying on webhook push for this specific case.
+**Product implication:** the retrieval half of the documented Facebook Login chain genuinely works — this is not a dead or broken edge. Combined with Tests C/D, the picture is now precise: **retrieval (`mentioned_media`) is confirmed working; webhook-based discovery is unresolved under Standard Access (see investigation above), specifically for arbitrary-public-triggered events.** The missing piece may be the access level, not necessarily the trigger mechanism itself. This directly informs `DECISION.md` question 2 ("what triggers ingestion") — Test E, below, tests a poll-based alternative that doesn't depend on webhook delivery at all.
+
+#### Test E — Hashtag Discovery → Mention Resolution (setup ready, not yet run, 2026-10-20)
+
+**Goal:** determine whether Challenge Curator submissions can be discovered via hashtag polling, sidestepping the unresolved mention-webhook question entirely — a genuinely different discovery mechanism, not another attempt at the same one.
+
+**Design:**
+1. A controlled public participant post containing both a unique test hashtag and @the_calligrail in its caption.
+2. `GET ig_hashtag_search` (Facebook Login only, `graph.facebook.com`) resolves the hashtag name to an IG Hashtag ID. Confirmed via Meta's current docs: requires `instagram_basic` (+ `pages_read_engagement` conditionally — both already granted), rate-limited to **30 unique hashtags per IG User per 7-day rolling window**.
+3. `GET /{hashtag-id}/recent_media` returns matching public media from the last 24 hours (max 50/page). Fields requested: `id, caption, media_type, permalink, timestamp, like_count, comments_count`. `username` deliberately not requested — Meta's docs state this edge cannot return it, by design, not a bug to work around.
+4. The resulting media `id` is fed into the already-working `/api/discovery/mentioned-media` endpoint to resolve `username`, `permalink`, `media_url`, `caption`, `timestamp`, `media_type` — reusing the retrieval mechanism already confirmed to work in the test above, rather than building a second retrieval path.
+
+**Code added:** `app/api/discovery/hashtag-search/route.ts` (new), handling steps 2–3. Step 4 reuses the existing `mentioned-media` route unchanged. `tsc --noEmit` and `next build` both pass clean. Not yet deployed/run.
+
+**Pass criterion, as specified:** if the controlled post appears in `recent_media` and the subsequent `mentioned_media` lookup resolves the participant's identity and metadata, this is recorded as a **PASS for poll-based challenge submission discovery** — a materially different, additional finding from (not a substitute for) the still-unresolved direct caption-mention-webhook question.
 
 #### Test C — caption-mention-only post, Instagram Login webhook: FAIL (recorded 2026-10-19)
 

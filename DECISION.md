@@ -24,40 +24,50 @@ a product-level decision about discovery mechanics (see Q3).
 
 ## 2. What triggers ingestion?
 
-**Unresolved — this is the central open problem of the spike so far.** Confirmed NOT to
-trigger: a pure caption-only @mention does not deliver a webhook event on Instagram Login's
-`comments` field (Test C, FAIL) or Facebook Login's dedicated `mentions` field (Test D, FAIL) —
-tested under real, correctly-configured, Published-app conditions on both paths. Confirmed TO
-trigger (eventually, mechanism not fully understood): a native "Tag people" tag becomes
-discoverable via Instagram Login's `/tags` polling edge (Test A1, PASS) — though what
-specifically caused the transition from empty to populated results (app Published status,
-webhook configuration, or a propagation delay) was never isolated, since multiple candidate
-changes happened close together.
+**Unresolved — but narrower than it first appeared.** No webhook delivery was observed for a
+pure caption-only @mention on either Instagram Login's `comments` field (Test C) or Facebook
+Login's dedicated `mentions` field (Test D). **Revised interpretation (2026-10-20): this is no
+confirmed DIRECT caption-mention discovery trigger under our current Standard Access
+configuration — not a confirmed statement that the mechanism itself doesn't work.** Both tests
+used deliberately non-role-holder participant accounts (correct per the spike brief's own
+Section 2 instruction), and Meta's webhook access-level docs state that Standard Access only
+delivers events triggered by people who have a role on the app — arbitrary public users require
+Advanced Access (App Review). This is a credible, not-yet-fully-isolated alternative explanation
+for the null result (see `SPIKE-RESULTS.md` Section 3.1). Confirmed TO trigger (eventually,
+mechanism not fully understood): a native "Tag people" tag becomes discoverable via Instagram
+Login's `/tags` polling edge (Test A1, PASS). **Test E (hashtag polling, setup ready, not yet
+run) tests an entirely separate, access-level-independent discovery path** — `ig_hashtag_search`
++ `recent_media` + `mentioned_media`, which doesn't depend on webhook delivery at all.
 
 ## 3. Support @mentions, tags, or both?
 
-**Current evidence points toward native tags being necessary, contradicting the product's
-originally stated preferred model** ("@mention = discovery, hashtags = validation and day
-assignment," `prompts/INSTAGRAM-API-SPIKE.md` Section 3). Native tags are the only mechanism
-with a confirmed, working discovery path (via `/tags` polling). Caption-only mentions have no
-confirmed discovery path on either login product as of this spike. This tension should be
-surfaced to product decision-makers directly rather than resolved quietly — it may mean
-requiring organizers to ask participants for both a caption mention (for credit/validation
-text) and a native tag (for actual discovery), which changes the participation instructions
-given to organizers.
+**Not yet decidable — current evidence shows native tags working and caption mentions not yet
+confirmed working via direct webhook/polling, but the latter may be a Standard Access artifact
+rather than a mechanism limitation (see Q2).** Native tags are the only mechanism with a
+confirmed, working discovery path so far (via `/tags` polling). Caption-only mentions have no
+confirmed *direct* discovery path on either login product as of this spike, under Standard
+Access. Test E is testing whether hashtag-based polling resolves this without relying on direct
+caption-mention discovery at all — if it passes, the product's original preferred model
+("@mention = discovery, hashtags = validation") may be achievable via a hashtag-first,
+mention-resolution-second flow rather than needing native tags. Premature to recommend
+requiring native tagging until Test E's result and the Standard Access question are both in.
 
 ## 4. Is polling/reconciliation required?
 
-**Yes, provisionally required — webhook push is confirmed unreliable for the primary intended
-signal (caption mention) on both login paths.** But polling itself only has a confirmed path
-for native tags (`/tags`), not for caption-only mentions — there is no documented listing/search
-edge for caption mentions under either login product; `mentioned_media` requires already
-knowing a media ID, it cannot discover new ones. This means reconciliation polling, as currently
-understood from the docs, does not by itself solve caption-only discovery either. Pagination
-behavior of `/tags` was also never fully confirmed (no `paging` object was ever returned in any
-response captured, despite Meta's docs describing cursor-based pagination for this edge) —
-worth re-testing with an explicit `limit` parameter before relying on `/tags` for a potentially
-large real history.
+**Likely yes, but the shape of it is still being determined.** Webhook push has not delivered
+for caption-only mentions under Standard Access in either test run (Tests C, D) — whether that's
+a mechanism limitation or an access-level artifact is unresolved (Q2). `/tags` polling has a
+confirmed working path for native tags, but no documented listing/search edge exists for
+caption-only mentions directly; `mentioned_media` requires already knowing a media ID, it cannot
+discover new ones. **Test E is testing whether hashtag-based polling (`ig_hashtag_search` +
+`recent_media` + `mentioned_media`) provides a working reconciliation path that sidesteps both
+the mention-webhook and the mention-listing gaps entirely** — if it passes, polling via the
+challenge hashtag (which the product already requires per its hashtag-validation model) becomes
+the answer to this question, independent of whatever is eventually found for direct mentions.
+Pagination behavior of `/tags` was also never fully confirmed (no `paging` object was ever
+returned in any response captured, despite Meta's docs describing cursor-based pagination for
+this edge) — worth re-testing with an explicit `limit` parameter before relying on `/tags` for a
+potentially large real history.
 
 ## 5. Which metadata is reliable?
 
@@ -102,31 +112,38 @@ an incidental observation, not a test of the limit itself.)
 
 ## 12. Meta review/access requirements?
 
-**Standard Access has been sufficient for everything tested so far** — no App Review or
-Advanced Access gate was hit on either login path, consistent with testing only against
-accounts/assets the app's own role-holder (Admin) owns and manages. However, this does **not**
-mean setup was frictionless: significant *self-serve configuration* difficulty was encountered
-on the Facebook Login path specifically — permissions not appearing in the expected picker
-until routed through the correct guided setup flow, and a lengthy misdirection around which
-Business Portfolio actually owned the test Page (see `SPIKE-RESULTS.md` Section 1b for the
-full trail). This is operational/UX friction for whoever sets up the production app, not a
-review/access blocker — worth distinguishing clearly in planning, since it's a one-time cost
-for us as the developer, not a recurring cost for organizers (except the Page-linking step
-itself, which organizers would need to do once per their own account — see Q1).
+**Revised 2026-10-20 — this is now a more load-bearing question than first assessed.** Standard
+Access has been sufficient for every *API read call* tested — listing Pages, retrieving
+`mentioned_media`, polling `/tags`, hashtag search — all against accounts/assets the app's own
+role-holder (Admin) owns and manages, no App Review hit. But **webhook event delivery may be a
+different story**: Meta's docs state Standard Access only delivers webhook events triggered by
+people with a role on the app; events from arbitrary public participants (exactly the production
+use case) require **Advanced Access, which requires App Review.** Tests C and D's null webhook
+results are consistent with this restriction, not yet proven to be caused by it (see Q2). If
+confirmed, **App Review for the relevant permission(s) would become a hard production
+requirement for any webhook-based discovery mechanism**, independent of which login path is
+chosen. Separately, significant *self-serve configuration* difficulty was encountered on the
+Facebook Login path — permissions not appearing in the expected picker until routed through the
+correct guided setup flow, and a lengthy misdirection around which Business Portfolio owned the
+test Page (see `SPIKE-RESULTS.md` Section 1b). That part is one-time developer friction, not a
+recurring organizer cost or a review gate — keep that distinct from the Advanced-Access question
+above, which could be a recurring production requirement.
 
 ## 13. Any blocker to the MVP?
 
-**One real, currently-unresolved blocker: no confirmed reliable discovery trigger for
-pure caption-only mentions, on either auth path.** This directly threatens the product's
-stated preferred participation mechanic. Per the spike's own Red-criteria ("participant
-mentions cannot be reliably discovered" — `prompts/INSTAGRAM-API-SPIKE.md` Section 25), this
-is trending toward Yellow/Red specifically for the caption-mention mechanic, **unless** one of
-the following resolves it: (a) a caption mention combined with a native tag (the pattern real
-`#callivember`-style posts already use) turns out to behave differently and reliably — not yet
-tested; (b) a reconciliation-polling endpoint for caption mentions exists but hasn't been found
-yet; or (c) the product accepts requiring native tagging as the primary discovery mechanic
-instead of (or alongside) caption mentions — a real product-level decision, not just an
-engineering workaround. All other tested capabilities (auth on both paths, Page/Instagram
-linkage, metadata retrieval once a media ID is known) are solid. This is not yet a Red verdict
-for the whole spike — it's a specific, isolated, well-characterized open question that the
-next test should target directly.
+**Revised 2026-10-20 — not confirmed as a blocker yet, narrowed to a specific open question
+under active investigation.** Previous framing ("no automated caption-mention discovery path")
+overstated the conclusion; corrected to: **no confirmed DIRECT caption-mention discovery path
+under our current Standard Access configuration.** Two live threads are open before this can be
+called a blocker one way or the other: (1) whether Test C/D's null webhook results are caused by
+Standard Access's documented restriction to role-holder-triggered events rather than a mechanism
+failure (see Q2, Q12) — not yet isolated; (2) **Test E**, testing whether hashtag-based polling
+(`ig_hashtag_search` → `recent_media` → `mentioned_media`) provides a working discovery path that
+doesn't depend on mention webhooks or Advanced Access at all — setup/code ready, not yet run. If
+Test E passes, it's recorded as a PASS for poll-based challenge submission discovery, a materially
+different and additional finding, even if direct caption-mention discovery remains unresolved.
+All other tested capabilities (auth on both paths, Page/Instagram linkage, metadata retrieval
+once a media ID is known) are solid. Per the spike's own Red-criteria ("participant mentions
+cannot be reliably discovered" — `prompts/INSTAGRAM-API-SPIKE.md` Section 25), this remains a
+specific, isolated, well-characterized open question, not a Red verdict for the whole spike —
+and Test E may resolve it without needing to answer the webhook/Advanced-Access question at all.
