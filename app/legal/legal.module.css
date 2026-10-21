@@ -1,0 +1,145 @@
+.header {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.backLink {
+  font-size: 14px;
+  color: var(--color-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 56px) 28px clamp(64px, 8vw, 100px);
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+.updated {
+  margin: 16px 0 0;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.intro {
+  margin: 28px 0 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+/* --- prose: the actual clause-by-clause content --- */
+
+.prose {
+  margin-top: 12px;
+}
+
+.prose h2 {
+  margin: 44px 0 14px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--color-ink);
+}
+
+.prose h2:first-of-type {
+  margin-top: 36px;
+}
+
+.prose h3 {
+  margin: 24px 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.prose p {
+  margin: 0 0 14px;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prose li {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.prose li::marker {
+  color: var(--color-olive);
+}
+
+.prose strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.prose section + section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+}
+
+.noteBox {
+  margin: 20px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.noteBox strong {
+  color: var(--color-ink);
+}

@@ -16,3 +16,12 @@
   font-size: 26px;
   color: var(--color-ink);
 }
+
+.nav {
+  display: flex;
+  gap: 16px;
+}
+
+.nav a {
+  color: var(--color-text-muted);
+}
