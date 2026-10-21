@@ -1,0 +1,18 @@
+.footer {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.logo {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  color: var(--color-ink);
+}

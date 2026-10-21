@@ -1,0 +1,22 @@
+/*
+ * Isolation wrapper for the legacy diagnostic page at /dev.
+ * Reinstates its pre-Stage-2 appearance (plain monospace, default link
+ * colors) so it stays visually independent from the new Grafeat global
+ * design foundation applied in the root layout / globals.css.
+ */
+
+.diagnostic {
+  font-family: monospace;
+  padding: 2rem;
+  max-width: 720px;
+  background: #fff;
+  color: #000;
+}
+
+.diagnostic a {
+  color: revert;
+}
+
+.diagnostic a:hover {
+  color: revert;
+}

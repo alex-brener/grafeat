@@ -1,0 +1,81 @@
+.hero {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: clamp(32px, 6vw, 72px) 28px clamp(36px, 5vw, 56px);
+  animation: lpin 0.6s ease-out;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 22px;
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(52px, 8.4vw, 124px);
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  max-width: 1100px;
+}
+
+.headlineAccent {
+  font-style: italic;
+  color: var(--color-olive);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px 56px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 34px;
+}
+
+.lede {
+  margin: 0;
+  max-width: 520px;
+  font-size: clamp(17px, 1.6vw, 20px);
+  line-height: 1.5;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primaryCta {
+  height: 50px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.secondaryCta {
+  height: 50px;
+  padding: 0 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+}

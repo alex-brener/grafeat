@@ -1,0 +1,126 @@
+.section {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: clamp(56px, 8vw, 100px) 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px 72px;
+  align-items: center;
+}
+
+.intro {
+  flex: 1 1 340px;
+  max-width: 480px;
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -0.015em;
+}
+
+.body {
+  margin: 22px 0 0;
+  font-size: 17px;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.card {
+  flex: 1 1 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  padding: 8px 22px;
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cardRowTight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.challengeName {
+  flex: 1;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.statusCompleted {
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  background: var(--color-badge-neutral-bg);
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.statusDraft {
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.duplicateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  color: var(--color-olive);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.duplicateArrow {
+  font-size: 18px;
+}
+
+.carryRow {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.carryCheck {
+  color: var(--color-olive);
+  font-weight: 700;
+}
+
+.carryLabel {
+  flex: 1;
+  font-weight: 500;
+}
+
+.carryDetail {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.hashtagRow {
+  padding: 12px 0 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

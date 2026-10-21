@@ -1,0 +1,93 @@
+/*
+ * Grafeat global design foundation.
+ * Tokens and base rules are extracted directly from the Claude Design export
+ * (`Grafeat prototype.zip` → Landing Page.dc.html`'s <helmet><style> block and
+ * inline styles) — not re-invented. See MERGE-ASSESSMENT.md Stage 2 report
+ * for the source audit. Values scoped to a single LP section are deliberately
+ * left out here for Stage 3.
+ */
+
+:root {
+  /* Background / paper */
+  --color-paper: #f4f1ea;
+
+  /* Ink / text */
+  --color-ink: #1d1c18; /* primary text, headings */
+  --color-ink-dark: #1f2118; /* inverse section background */
+  --color-text: #3e3b33; /* body copy */
+  --color-text-muted: #5e5a50; /* eyebrow labels, secondary text */
+  --color-text-on-dark: #d9d5c8; /* muted text on dark sections */
+  --color-text-faint: #b9b5a8; /* fine print */
+
+  /* Olive / accent */
+  --color-olive: #5c6127; /* links, CTA highlight */
+  --color-olive-light: #b9bc8e; /* olive accent on dark sections */
+
+  /* Muted / border */
+  --color-border: #e2ddd1; /* hairline borders */
+  --color-border-strong: #cfc9bb; /* card / secondary-button borders */
+
+  /* Section-specific colors (added in Stage 3, required by the LP) */
+  --color-card-paper: #fbfaf6; /* duplicate-challenge card background */
+  --color-badge-neutral-bg: #eae6dc; /* "Completed" status pill */
+  --color-badge-olive-bg: #e6e6d0; /* "Automatic" ritual pill background */
+  --color-badge-olive-text: #3a3d16; /* "Automatic" ritual pill text */
+  --color-stat-muted: #6f6a5e; /* ritual step index numerals */
+  --color-error: #e9b79e; /* early-access form validation error text */
+
+  /* Typography */
+  --font-sans: var(--font-albert-sans), system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), serif;
+
+  /* Spacing / radius (confirmed reused across multiple LP elements) */
+  --radius-sm: 6px; /* buttons, small controls */
+  --radius-md: 10px; /* cards */
+  --radius-full: 999px; /* pills, badges */
+  --container-max: 1280px; /* primary content container width */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: var(--color-olive);
+}
+
+a:hover {
+  color: var(--color-ink);
+}
+
+/* Used by the LP hero section and the early-access "submitted" state. */
+@keyframes lpin {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

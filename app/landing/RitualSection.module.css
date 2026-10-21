@@ -1,0 +1,100 @@
+.section {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: clamp(64px, 9vw, 120px) 28px 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px 72px;
+}
+
+.intro {
+  flex: 1 1 340px;
+  max-width: 460px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -0.015em;
+}
+
+.body {
+  margin: 22px 0 0;
+  font-size: 17px;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.list {
+  flex: 1 1 520px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.index {
+  width: 26px;
+  flex: none;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--color-stat-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemStep {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.itemHow {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.badgeAuto {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-badge-olive-bg);
+  color: var(--color-badge-olive-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.badgeYou {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}

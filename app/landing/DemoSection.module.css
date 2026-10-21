@@ -1,0 +1,119 @@
+.section {
+  background: var(--color-ink-dark);
+  color: var(--color-paper);
+  padding: 28px 0 40px;
+}
+
+.inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 28px;
+  padding: 0 4px 18px;
+}
+
+.toolbarText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-olive-light);
+}
+
+.headline {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.fullscreenButton {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(244, 241, 234, 0.3);
+  background: transparent;
+  color: var(--color-paper);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.frame {
+  position: relative;
+  height: clamp(600px, 82vh, 860px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-paper);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.35);
+}
+
+.frameExpanded {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 44px;
+  bottom: 0;
+  height: auto;
+  z-index: 1000;
+  border-radius: 0;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 4px 0;
+  font-size: 13px;
+  color: var(--color-text-faint);
+}
+
+.doneLink {
+  color: var(--color-paper);
+  font-weight: 600;
+}
+
+.exitBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 44px;
+  z-index: 1001;
+  background: var(--color-ink-dark);
+  color: var(--color-paper);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.exitButton {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(244, 241, 234, 0.3);
+  background: transparent;
+  color: var(--color-paper);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

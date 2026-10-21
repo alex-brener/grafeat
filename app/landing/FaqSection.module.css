@@ -1,0 +1,41 @@
+.section {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 40px 28px clamp(64px, 8vw, 100px);
+}
+
+.heading {
+  margin: 0 0 30px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(36px, 4vw, 52px);
+  line-height: 1;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 0 56px;
+  border-top: 1px solid var(--color-border);
+}
+
+.item {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.question {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.answer {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-text);
+  text-wrap: pretty;
+}
