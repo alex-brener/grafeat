@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { FACEBOOK_OAUTH_STATE_COOKIE, generateOAuthState, setOAuthStateCookie } from "@/lib/oauth";
 
 export const runtime = "nodejs";
 
@@ -32,11 +33,20 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectUri = `${baseUrl}/api/auth/facebook/callback`;
+
+  // CSRF protection: a random, unguessable value stored in a short-lived
+  // HttpOnly cookie and echoed back by Meta in the callback's `state` param.
+  // The callback rejects any request whose state doesn't match this cookie.
+  const state = generateOAuthState();
+
   const authorizeUrl = new URL(`https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`);
   authorizeUrl.searchParams.set("client_id", appId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("config_id", configId);
+  authorizeUrl.searchParams.set("state", state);
 
-  return NextResponse.redirect(authorizeUrl.toString());
+  const response = NextResponse.redirect(authorizeUrl.toString());
+  setOAuthStateCookie(response, FACEBOOK_OAUTH_STATE_COOKIE, state);
+  return response;
 }

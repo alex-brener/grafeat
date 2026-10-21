@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { INSTAGRAM_OAUTH_STATE_COOKIE, generateOAuthState, setOAuthStateCookie } from "@/lib/oauth";
 
 export const runtime = "nodejs";
 
@@ -26,11 +27,20 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectUri = `${baseUrl}/api/auth/instagram/callback`;
+
+  // CSRF protection: a random, unguessable value stored in a short-lived
+  // HttpOnly cookie and echoed back by Meta in the callback's `state` param.
+  // The callback rejects any request whose state doesn't match this cookie.
+  const state = generateOAuthState();
+
   const authorizeUrl = new URL("https://www.instagram.com/oauth/authorize");
   authorizeUrl.searchParams.set("client_id", appId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("scope", SCOPES);
+  authorizeUrl.searchParams.set("state", state);
 
-  return NextResponse.redirect(authorizeUrl.toString());
+  const response = NextResponse.redirect(authorizeUrl.toString());
+  setOAuthStateCookie(response, INSTAGRAM_OAUTH_STATE_COOKIE, state);
+  return response;
 }

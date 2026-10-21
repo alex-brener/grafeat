@@ -8,6 +8,7 @@ const SECRET_KEYS = new Set([
   "code",
   "verify_token",
   "hub.verify_token",
+  "state",
 ]);
 
 /** Deep-redacts known secret-bearing keys so logs/fixtures are safe to persist or commit. */

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logEvent } from "@/lib/logger";
+import { INSTAGRAM_OAUTH_STATE_COOKIE, finalizeCallbackResponse, verifyOAuthState } from "@/lib/oauth";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,26 @@ export async function GET(req: NextRequest) {
   const start = Date.now();
   const code = req.nextUrl.searchParams.get("code");
   const errorParam = req.nextUrl.searchParams.get("error");
+  const stateParam = req.nextUrl.searchParams.get("state");
+  const expectedState = req.cookies.get(INSTAGRAM_OAUTH_STATE_COOKIE)?.value;
+
+  // Verify CSRF state before anything else — reject missing, mismatched, or
+  // expired (cookie no longer present) state regardless of whether this is
+  // an error or success callback.
+  if (!verifyOAuthState(expectedState, stateParam)) {
+    await logEvent({
+      testCaseId: "auth.instagram_login.invalid_state",
+      endpoint: "/api/auth/instagram/callback",
+      method: "GET",
+      status: "error",
+      response: { error: "invalid_state" },
+      result: "FAIL",
+    });
+    return finalizeCallbackResponse(
+      NextResponse.json({ error: "Invalid or expired state" }, { status: 400 }),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
+  }
 
   if (errorParam) {
     await logEvent({
@@ -17,14 +38,20 @@ export async function GET(req: NextRequest) {
       response: { error: errorParam },
       result: "FAIL",
     });
-    return NextResponse.json({ error: errorParam }, { status: 400 });
+    return finalizeCallbackResponse(
+      NextResponse.json({ error: errorParam }, { status: 400 }),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
   }
 
   const appId = process.env.INSTAGRAM_APP_ID;
   const appSecret = process.env.INSTAGRAM_APP_SECRET;
   const baseUrl = process.env.BASE_URL;
   if (!code || !appId || !appSecret || !baseUrl) {
-    return NextResponse.json({ error: "Missing code or app env vars" }, { status: 400 });
+    return finalizeCallbackResponse(
+      NextResponse.json({ error: "Missing code or app env vars" }, { status: 400 }),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
   }
 
   const redirectUri = `${baseUrl}/api/auth/instagram/callback`;
@@ -58,7 +85,10 @@ export async function GET(req: NextRequest) {
   });
 
   if (!shortLivedRes.ok) {
-    return NextResponse.json({ step: "short_lived_exchange", shortLived }, { status: 502 });
+    return finalizeCallbackResponse(
+      NextResponse.json({ step: "short_lived_exchange", shortLived }, { status: 502 }),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
   }
 
   // Step 2: exchange short-lived for a long-lived token, to test lifetime/refresh behavior.
@@ -82,12 +112,10 @@ export async function GET(req: NextRequest) {
     latencyMs: Date.now() - longLivedStart,
   });
 
-  // Meta controls this redirect and only appends `code`/`error` — there's no
-  // way for us to receive a per-request reveal flag from the query string.
-  // Gate on an env var instead: set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel
-  // only while deliberately capturing a token, then unset it again.
-  const reveal = process.env.DIAGNOSTIC_REVEAL_TOKENS === "true";
-
+  // Raw tokens are never included in this response, in any environment.
+  // Obtain ORGANIZER_ACCESS_TOKEN by running this flow against a local dev
+  // server (BASE_URL=http://localhost:... in .env.local) instead, and copy
+  // the token from there directly into Vercel's env var UI.
   const safe = {
     success: true,
     instagramUserId: shortLived?.user_id,
@@ -98,13 +126,11 @@ export async function GET(req: NextRequest) {
     accessTokenPrefix: longLived?.access_token ? longLived.access_token.slice(0, 4) : null,
   };
 
-  return NextResponse.json({
-    note: reveal
-      ? "DIAGNOSTIC_REVEAL_TOKENS=true — raw tokens included below. Copy into env vars, then unset that flag and redeploy."
-      : "Tokens are not rendered by default. Set DIAGNOSTIC_REVEAL_TOKENS=true in Vercel env vars, redeploy, and re-run this flow once to retrieve them.",
-    ...safe,
-    ...(reveal
-      ? { rawShortLivedToken: shortLived.access_token, rawLongLivedToken: longLived.access_token }
-      : {}),
-  });
+  return finalizeCallbackResponse(
+    NextResponse.json({
+      note: "Raw tokens are not returned by this endpoint. Retrieve ORGANIZER_ACCESS_TOKEN by running this OAuth flow against a local dev server instead.",
+      ...safe,
+    }),
+    INSTAGRAM_OAUTH_STATE_COOKIE
+  );
 }
