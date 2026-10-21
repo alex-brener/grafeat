@@ -256,3 +256,40 @@ I could not reproduce or directly inspect what you saw (no browser here), so I c
 `git diff --stat` against `app/api/**`, Meta integration code, `.env*`, legal-page content, and `fixtures/`/`research_notes/` shows no changes. The ported Challenge Curator makes no network calls anywhere — publishing, verification, duplication, and settings are all local component state, matching the source's own "Demo only: nothing is posted to Instagram."
 
 Stopped here per the correction's scope — no production `/app`, `/dashboard`, authentication, persistence, or API integration was added.
+
+---
+
+## Deployment fix — Vercel build failure in next/font/google
+
+### Root cause (as precisely as establishable without Vercel's exact build logs)
+
+`next/font/google` doesn't just generate CSS — at **build time**, `next build` itself makes an HTTP request to `fonts.googleapis.com` to fetch each font family's CSS, parses out the `url(...)` references, then downloads the actual font files from `fonts.gstatic.com` and self-hosts them in the output. This fetch-and-parse happens on whatever machine runs `next build` — locally that succeeded (this environment has outbound internet access, confirmed by re-fetching the same URLs during this fix). On Vercel's build machine, that request evidently failed, timed out, or returned something other than valid font CSS (DNS/egress restriction, transient Google Fonts hiccup, or a proxy/firewall rule in that specific build environment — Vercel's build sandboxes don't guarantee unrestricted external network access, and this is a documented class of failure for `next/font/google`). When the loader's regex match against the (empty/unexpected) response fails, `match[1]` is `null`, and indexing into it throws exactly `Cannot read properties of null (reading '1')` — matching the reported stack trace in `next/dist/compiled/@next/font/dist/google/loader.js`. This is a build-time network dependency, not a code bug in `app/layout.tsx` — the component code was correct; the problem is that `next/font/google` silently requires internet access to Google's servers during `next build`, which isn't guaranteed on every hosting provider's build infrastructure.
+
+### Fix
+
+Switched from `next/font/google` to **`next/font/local`**, self-hosting the exact same font files Google serves. The actual Albert Sans / Instrument Serif / Pinyon Script / Bagel Fat One / Bodoni Moda `.woff2` files were fetched once (from the same `fonts.gstatic.com` URLs `next/font/google` itself would have used, for the same weights/styles/subset the prior config requested) and committed to the repo. `next build` now never makes a network call for fonts — fully deterministic, works identically on any build machine regardless of network policy.
+
+I fixed all 5 font loads, not just the 2 Vercel reported (Albert Sans, Instrument Serif). The other 3 (`app/landing/curator/curatorFonts.ts` — Pinyon Script, Bagel Fat One, Bodoni Moda, used by the ported Challenge Curator's procedural artwork) call `next/font/google` the same way and would hit the identical build failure the moment Next's compiler reached that module — very likely why Vercel's build log showed only 2 errors before stopping, not evidence that those 3 were fine. Leaving them on `next/font/google` would have just meant discovering a second, near-identical deployment blocker on the next attempt, which doesn't match "the smallest robust production fix" — robust here means actually unblocking deployment, not patching only the two symptoms that happened to surface first.
+
+### Files changed
+
+- **New:** `app/fonts/` — 7 self-hosted font files (deduped by actual distinct file, matching exactly what Google's own CSS serves — Albert Sans and Bodoni Moda are variable fonts, so Google serves one file per style covering the whole weight range; downloading 1 file and declaring multiple weight entries against it, same as Google's own CSS does, is correct, not a shortcut):
+  - `albert-sans-latin.woff2` (covers weights 400/500/600/700)
+  - `instrument-serif-normal-latin.woff2`, `instrument-serif-italic-latin.woff2`
+  - `pinyon-script-latin.woff2`
+  - `bagel-fat-one-latin.woff2`
+  - `bodoni-moda-normal-latin.woff2`, `bodoni-moda-italic-latin.woff2` (each covers weights 400/800)
+- **Modified:** `app/layout.tsx` — `Albert_Sans`/`Instrument_Serif` from `next/font/google` replaced with two `next/font/local` calls pointing at the files above, same weights/styles as before.
+- **Modified:** `app/landing/curator/curatorFonts.ts` — same swap for `Pinyon_Script`/`Bagel_Fat_One`/`Bodoni_Moda`.
+
+No other files changed. Nothing under `app/api/**`, Meta integration, `.env*`, legal content, or research/fixtures was touched. No dependency version changes — `next/font/local` ships in the same `next` package as `next/font/google`, already installed.
+
+### Verification
+- `npx tsc --noEmit` — clean.
+- `npm run build` — succeeds; identical route sizes to the prior `next/font/google` build (`/` still 26.4 kB / 129 kB First Load JS), confirming no bundle-size regression.
+- Inspected `.next/static/` after build: zero references to `fonts.googleapis.com` or `fonts.gstatic.com` anywhere in the output (`grep` came back empty) — confirming the build is now fully self-hosted with no runtime *or* build-time dependency on Google Fonts. Exactly 7 unique `.woff2` files emitted, matching the 7 source files.
+
+### CSS variable compatibility
+Confirmed identical in the built CSS: `--font-albert-sans`, `--font-instrument-serif`, `--font-pinyon-script`, `--font-bagel-fat-one`, `--font-bodoni-moda` all present with the same names as before. `globals.css`'s `--font-sans`/`--font-serif` aliases and `curatorArt.tsx`'s direct references are untouched and need no changes — the LP and the ported Challenge Curator prototype render with the same fonts, same weights, same variable names as prior to this fix.
+
+Stopped here — this was a deployment-blocker fix only; no landing-page or product UI changed.
