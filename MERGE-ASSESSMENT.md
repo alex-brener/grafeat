@@ -293,3 +293,44 @@ No other files changed. Nothing under `app/api/**`, Meta integration, `.env*`, l
 Confirmed identical in the built CSS: `--font-albert-sans`, `--font-instrument-serif`, `--font-pinyon-script`, `--font-bagel-fat-one`, `--font-bodoni-moda` all present with the same names as before. `globals.css`'s `--font-sans`/`--font-serif` aliases and `curatorArt.tsx`'s direct references are untouched and need no changes — the LP and the ported Challenge Curator prototype render with the same fonts, same weights, same variable names as prior to this fix.
 
 Stopped here — this was a deployment-blocker fix only; no landing-page or product UI changed.
+
+---
+
+## Second security-hardening patch — /dev protection, robots.txt, baseline security headers
+
+Follow-up to the first OAuth hardening patch (CSRF state, raw-token removal, `no-store`/`no-referrer` on callbacks — see git history, commit `110373e`). This patch addresses the remaining items from the earlier Safe Browsing investigation: `/dev`'s lack of access control, the absence of `robots.txt`, and the lack of baseline security headers site-wide.
+
+### Files changed
+- **Modified:** `app/dev/layout.tsx` — server-side `notFound()` gate when `NODE_ENV === "production"`, plus `robots: { index: false, follow: false }` metadata as defense in depth.
+- **New:** `app/robots.ts` — Next.js's App Router robots-route convention; disallows `/api/` and `/dev`, allows everything else.
+- **Modified:** `next.config.mjs` — added `headers()` returning baseline security headers for every route.
+
+Nothing under `app/api/auth/**` was touched (`git diff --stat -- app/api/auth` is empty) — no OAuth logic, scopes, or permissions changed.
+
+### /dev protection
+Gated in `app/dev/layout.tsx` (not just `page.tsx`), so any future route added under `/dev/*` inherits the same gate automatically. `NODE_ENV === "production"` is true for `next build` + `next start` and for **any** Vercel deployment — Production *and* Preview, since Vercel always builds in production mode for both. That's intentional, not an oversight: Preview deployments are just as publicly reachable as Production, and the whole point of this patch is closing exactly that kind of exposure. `NODE_ENV === "development"` only under `next dev`, which is the one context where the route needs to keep working — confirmed by testing both: `next build && next start` → `/dev` returns `404`; `next dev` → `/dev` returns `200` and renders normally (log: `GET /dev 200 in 436ms`, no errors).
+
+### robots.txt
+Standard Next.js `app/robots.ts` convention, auto-served at `/robots.txt` (confirmed in both the build output and a live response: `Allow: /`, `Disallow: /api/`, `Disallow: /dev`). Confirmed this has zero effect on real OAuth traffic — robots.txt is an advisory convention only crawlers respect; it has no bearing on an actual user's browser being redirected into `/api/auth/*/callback` by Meta, which isn't a crawl at all.
+
+### Security headers — a real compatibility bug found and fixed during testing
+First implementation used one blanket header rule for `/:path*` including `Referrer-Policy: strict-origin-when-cross-origin`. Testing against a real production build (`next build && next start` + `curl`) showed this **silently overrode** the OAuth callbacks' own `Referrer-Policy: no-referrer` — Next.js's config-level `headers()` takes precedence over a header a route handler sets on its own `NextResponse` for the same key, which contradicted my initial assumption (I did not assume this was safe without testing it, and it's good I didn't — it wasn't). Fixed by splitting the rule: `/api/:path*` gets `Referrer-Policy: no-referrer` directly (which happens to match, not fight, what the callbacks already set — and reasonably extends the stricter policy to the webhook/discovery endpoints too, not just the two callbacks), and everything else gets `strict-origin-when-cross-origin`. Re-tested and confirmed: `/api/auth/facebook/callback` and `/api/auth/instagram/callback` both now show `Referrer-Policy: no-referrer` and `Cache-Control: no-store` (the latter was never at risk — no global Cache-Control rule exists at all, so the callbacks' own value was always the only source).
+
+### CSP compatibility concerns (the main thing to flag)
+- **`script-src` needs `'unsafe-inline'`.** Next.js's App Router injects inline `<script>` tags for hydration/streaming data. Without `'unsafe-inline'` (or nonce-based CSP via `middleware.ts`, which this patch does not add), the app would not hydrate — pages would render but be non-interactive. This is a known, documented Next.js tradeoff; tightening it to nonce-based CSP is a reasonable follow-up but is a bigger architectural change than "baseline."
+- **`style-src` needs `'unsafe-inline'`.** This is the more Grafeat-specific one: the ported Challenge Curator product (most of the actual application UI) is built almost entirely with React inline `style={{...}}` objects — a deliberate choice made when porting `Challenge Curator.dc.html` faithfully (see the Stage 3 report above). Those compile to inline `style="..."` HTML attributes, which CSP's `style-src` governs. Without `'unsafe-inline'` here, the Curator UI would render unstyled/broken. Removing this would require a substantial refactor to CSS Modules/classes across the whole curator component tree — explicitly out of scope for this patch.
+- **No Meta-integration compatibility issues.** All Instagram/Facebook Graph API calls happen server-side in Route Handlers (Node runtime), never from client-side `fetch`/XHR — so CSP's `connect-src 'self'` doesn't touch them at all. The OAuth redirects to `facebook.com`/`instagram.com` are full top-level navigations, which CSP doesn't govern. `font-src 'self'` is sufficient only because fonts are already self-hosted (first deployment-blocker fix) — this would have needed `fonts.googleapis.com`/`fonts.gstatic.com` allowlisted had that migration not already happened.
+- **`frame-ancestors 'none'`** is set alongside `X-Frame-Options: DENY` deliberately (belt-and-suspenders — `frame-ancestors` is the modern CSP equivalent of `X-Frame-Options` and takes precedence in browsers that support it, but older browsers only honor the header).
+
+### Test results
+- `npx tsc --noEmit` — clean.
+- `npm run build` — succeeds; new routes appear as `○ /robots.txt` and `○ /dev` (both statically generated — `/dev`'s static output is the baked-in 404, since `NODE_ENV` is already `"production"` during `next build` itself).
+- `next build && next start`, then live `curl` checks:
+  - `/dev` → `404`.
+  - `/robots.txt` → correct `Allow`/`Disallow` rules.
+  - `/`, `/privacy` → all 5 baseline headers present, `Referrer-Policy: strict-origin-when-cross-origin`.
+  - `/api/auth/facebook/callback`, `/api/auth/instagram/callback` → baseline headers present, **and** `Referrer-Policy: no-referrer` + `Cache-Control: no-store` confirmed intact (not overridden).
+  - `/api/webhooks/instagram` → also gets `no-referrer` via the `/api/*` rule, harmless.
+- `next dev` separately confirmed: `/dev` → `200`, renders normally, no console/server errors, HMR unaffected.
+
+Not committed or deployed, per instruction.
