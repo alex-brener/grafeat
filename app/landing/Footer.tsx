@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <footer className={styles.footer}>
       <span className={styles.logo}>
-        <Image src={logoMark} alt="" width={34} height={34} className={styles.logoMark} />
+        <Image src={logoMark} alt="" width={30} height={30} className={styles.logoMark} />
         Grafeat
       </span>
       <span>Made for people who run creative challenges on Instagram. Not affiliated with Instagram or Meta.</span>

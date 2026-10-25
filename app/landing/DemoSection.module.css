@@ -53,6 +53,17 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.fullscreenButton:hover {
+  background: rgba(244, 241, 234, 0.1);
+  border-color: rgba(244, 241, 234, 0.5);
+}
+
+.fullscreenButton:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 2px;
 }
 
 .frame {
@@ -88,6 +99,17 @@
 .doneLink {
   color: var(--color-paper);
   font-weight: 600;
+  border-radius: 3px;
+  transition: color 180ms ease;
+}
+
+.doneLink:hover {
+  color: var(--color-olive-light);
+}
+
+.doneLink:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 3px;
 }
 
 .exitBar {
@@ -116,4 +138,23 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.exitButton:hover {
+  background: rgba(244, 241, 234, 0.1);
+  border-color: rgba(244, 241, 234, 0.5);
+}
+
+.exitButton:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fullscreenButton,
+  .doneLink,
+  .exitButton {
+    transition: none;
+  }
 }

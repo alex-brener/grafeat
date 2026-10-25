@@ -82,6 +82,18 @@
   font-size: 15px;
   font-weight: 400;
   outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: rgba(244, 241, 234, 0.4);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--color-olive-light);
+  box-shadow: 0 0 0 3px rgba(185, 188, 142, 0.25);
 }
 
 .input {
@@ -133,6 +145,17 @@
   color: var(--color-paper);
   font-size: 14px;
   cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.freqOptionOff:hover {
+  background: rgba(244, 241, 234, 0.1);
+  border-color: rgba(244, 241, 234, 0.5);
+}
+
+.freqOptionOff:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 2px;
 }
 
 .timeFromDemo {
@@ -156,6 +179,17 @@
   text-align: left;
   font-family: inherit;
   color: inherit;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.betaRow:hover {
+  background: rgba(244, 241, 234, 0.06);
+  border-color: rgba(244, 241, 234, 0.35);
+}
+
+.betaRow:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 2px;
 }
 
 .betaCheckOn {
@@ -215,6 +249,31 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  transition: opacity 180ms ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-olive-light);
+  outline-offset: 2px;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .textarea,
+  .freqOptionOff,
+  .betaRow,
+  .submitButton {
+    transition: none;
+  }
 }
 
 .errorText {

@@ -43,6 +43,17 @@
 .navLink {
   color: var(--color-text);
   text-decoration: none;
+  border-radius: 3px;
+  transition: color 180ms ease;
+}
+
+.navLink:hover {
+  color: var(--color-ink);
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
 }
 
 .navCta {
@@ -56,4 +67,22 @@
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.navCta:hover {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.navCta:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navLink,
+  .navCta {
+    transition: none;
+  }
 }
