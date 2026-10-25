@@ -108,15 +108,38 @@ export async function sendEarlyAccessNotification(data: {
     }),
   });
 
+  if (!res.ok) {
+    // Resend's error body carries a machine-readable `name` (e.g.
+    // "validation_error") and a human `message` (e.g. which domain isn't
+    // verified) — neither ever includes the API key or this request's body,
+    // so logging them is safe and is exactly the detail needed to diagnose
+    // a rejection without re-triggering a real send just to see why.
+    const errorBody = (await res.json().catch(() => null)) as { name?: string; message?: string } | null;
+    const code = errorBody?.name ?? null;
+    const message = errorBody?.message ?? null;
+
+    await logEvent({
+      testCaseId: "early_access.notify.send",
+      endpoint: "https://api.resend.com/emails",
+      method: "POST",
+      status: res.status,
+      result: "FAIL",
+      notes:
+        code || message
+          ? `Resend error: ${code ?? "unknown"} — ${message ?? "(no message)"}`
+          : "Resend returned a non-ok status with no parseable error body",
+    });
+
+    throw new Error(
+      `Early-access notification failed to send (status ${res.status}${code ? `, ${code}` : ""}${message ? `: ${message}` : ""})`
+    );
+  }
+
   await logEvent({
     testCaseId: "early_access.notify.send",
     endpoint: "https://api.resend.com/emails",
     method: "POST",
     status: res.status,
-    result: res.ok ? "PASS" : "FAIL",
+    result: "PASS",
   });
-
-  if (!res.ok) {
-    throw new Error(`Early-access notification failed to send (status ${res.status})`);
-  }
 }

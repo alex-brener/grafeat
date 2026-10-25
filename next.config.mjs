@@ -6,6 +6,15 @@
  *   injects inline bootstrap/hydration <script> tags; removing it would
  *   need nonce-based CSP via middleware.ts, which this baseline patch does
  *   not add.
+ * - `script-src 'unsafe-eval'` is added ONLY in development (never in a
+ *   production build/NODE_ENV). Next's dev-mode React Fast Refresh runtime
+ *   (@next/react-refresh-utils) evaluates code via `eval()` to apply hot
+ *   updates; without 'unsafe-eval' the browser throws an uncaught EvalError
+ *   while executing main-app.js, which aborts that script before React
+ *   finishes hydrating — every interactive element on the page silently
+ *   stops responding to clicks, with no error specific to any one
+ *   component. Production bundles don't use eval-based HMR, so this
+ *   relaxation never applies there — the production CSP is unchanged.
  * - `style-src 'unsafe-inline'` is required because this app renders most
  *   of its UI (notably the ported Challenge Curator product) with React
  *   inline `style={{...}}` objects, which compile to inline `style="..."`
@@ -25,9 +34,11 @@
  * lib/oauth.ts#finalizeCallbackResponse sets. Cache-Control has no global
  * rule at all, so the callbacks' own `no-store` is untouched by this file.
  */
+const isDev = process.env.NODE_ENV !== "production";
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",

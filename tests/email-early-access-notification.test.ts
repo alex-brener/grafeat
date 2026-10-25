@@ -54,13 +54,35 @@ describe("sendEarlyAccessNotification", () => {
     expect(init.headers.Authorization).toBe("Bearer re_test_key");
   });
 
-  it("throws when Resend responds with a non-ok status", async () => {
+  it("throws when Resend responds with a non-ok status and no parseable body", async () => {
     process.env.RESEND_API_KEY = "re_test_key";
     process.env.MAGIC_LINK_FROM_EMAIL = "noreply@grafeat.app";
     process.env.EARLY_ACCESS_NOTIFY_EMAIL = "team@grafeat.app";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.reject(new Error("not json")) })
+    );
 
     await expect(sendEarlyAccessNotification(sampleData)).rejects.toThrow(/failed to send/i);
+  });
+
+  it("surfaces Resend's error code and message in the thrown error", async () => {
+    process.env.RESEND_API_KEY = "re_test_key";
+    process.env.MAGIC_LINK_FROM_EMAIL = "noreply@grafeat.app";
+    process.env.EARLY_ACCESS_NOTIFY_EMAIL = "team@grafeat.app";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({ statusCode: 403, name: "validation_error", message: "The domain is not verified" }),
+      })
+    );
+
+    await expect(sendEarlyAccessNotification(sampleData)).rejects.toThrow(
+      /403.*validation_error.*domain is not verified/i
+    );
   });
 
   it("throws on a network-level failure", async () => {
