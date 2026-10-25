@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -28,10 +28,57 @@ const instrumentSerif = localFont({
   display: "swap",
 });
 
+// title/description/OG/Twitter copy is drawn verbatim from the Hero section's
+// own eyebrow + lede (app/landing/Hero.tsx) rather than invented here, so the
+// two stay in sync. The per-page titles already set on /privacy, /terms, and
+// /data-deletion are full literal strings (e.g. "Privacy Policy — Grafeat"),
+// not a template substitution — a Next `title.template` here would double
+// that "— Grafeat" suffix on those pages, so this stays a plain default.
+const SITE_TITLE = "Grafeat — For organizers of recurring Instagram art challenges";
+const SITE_DESCRIPTION =
+  "Grafeat collects your challenge submissions, checks the rules, prepares your carousel and keeps every credit in order.";
+
 export const metadata: Metadata = {
-  title: "Grafeat",
-  description:
-    "Grafeat collects your challenge submissions, checks the rules, prepares your carousel and keeps every credit in order.",
+  // Enables correctly-resolved absolute URLs for the Open Graph/Twitter
+  // fields below. Falls back to undefined (Next just skips resolution) if
+  // BASE_URL isn't set in this environment yet.
+  metadataBase: process.env.BASE_URL ? new URL(process.env.BASE_URL) : undefined,
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: "Grafeat",
+  keywords: [
+    "Instagram art challenge",
+    "Instagram challenge submissions",
+    "Instagram carousel",
+    "challenge curation",
+  ],
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    siteName: "Grafeat",
+    type: "website",
+    locale: "en_US",
+    // Image itself is NOT set here — app/opengraph-image.png (1200×630) is
+    // Next's file-naming convention for this, auto-detected and injected
+    // into both the og:image and (absent a separate twitter-image file)
+    // twitter:image tags with no metadata-object wiring needed. Currently a
+    // temporary/placeholder image; swap that file for final branding art
+    // whenever it's ready — no code change required here.
+  },
+  twitter: {
+    // summary_large_image, matching the opengraph-image.png convention
+    // file above having a real image now.
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+};
+
+export const viewport: Viewport = {
+  // Matches --color-paper (app/globals.css) — tints mobile browser chrome
+  // (e.g. Android Chrome's status bar) to the page background instead of
+  // leaving it default black/white.
+  themeColor: "#f4f1ea",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

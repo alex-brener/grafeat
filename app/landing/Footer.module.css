@@ -12,9 +12,18 @@
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-serif);
-  font-size: 26px;
+  font-size: 30px;
   color: var(--color-ink);
+}
+
+.logoMark {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
 }
 
 .nav {
