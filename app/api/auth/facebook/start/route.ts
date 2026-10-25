@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FACEBOOK_OAUTH_STATE_COOKIE, generateOAuthState, setOAuthStateCookie } from "@/lib/oauth";
+import { auth } from "@/lib/auth";
+import { getDb } from "@/lib/db/client";
+import { createConnectIntent } from "@/lib/oauth-connect-intent";
 
 export const runtime = "nodejs";
 
@@ -32,12 +35,29 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // This connect flow attaches a Meta identity to a workspace, so it must
+  // run as an authenticated Grafeat user with an active workspace — not an
+  // anonymous visitor. The callback never trusts anything Meta echoes back
+  // for *which* workspace to attach to; that correlation is established
+  // here, server-side, before the redirect to Meta even happens.
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.session.activeOrganizationId) {
+    return NextResponse.redirect(new URL("/login?next=/dashboard", req.url));
+  }
+
   const redirectUri = `${baseUrl}/api/auth/facebook/callback`;
 
   // CSRF protection: a random, unguessable value stored in a short-lived
   // HttpOnly cookie and echoed back by Meta in the callback's `state` param.
   // The callback rejects any request whose state doesn't match this cookie.
   const state = generateOAuthState();
+
+  await createConnectIntent(getDb(), {
+    nonce: state,
+    userId: session.user.id,
+    organizationId: session.session.activeOrganizationId,
+    provider: "facebook_login",
+  });
 
   const authorizeUrl = new URL(`https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`);
   authorizeUrl.searchParams.set("client_id", appId);

@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useLandingDemo } from "./DemoContext";
 import { frequencyOptions, NOT_DAILY_ANSWER } from "./content";
+import { EMAIL_RE } from "@/lib/validation";
 import styles from "./EarlyAccessSection.module.css";
-
-const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export function EarlyAccessSection() {
   const { formRef, timeAnswer } = useLandingDemo();
@@ -15,13 +14,19 @@ export function EarlyAccessSection() {
   const [freq, setFreq] = useState<string | null>(null);
   const [pain, setPain] = useState("");
   const [beta, setBeta] = useState(false);
+  // Honeypot — a real visitor never sees or fills this (visually hidden,
+  // aria-hidden, unreachable by Tab). Any value here means a bot filled it
+  // blind, and the server (app/api/early-access/route.ts) drops the
+  // submission silently rather than rejecting it outright.
+  const [website, setWebsite] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
   const hasTime = !!timeAnswer && timeAnswer !== NOT_DAILY_ANSWER;
   const timeAnswerLower = (timeAnswer ?? "").toLowerCase();
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const acct = account.trim();
     if (!acct) {
       setError("Add your challenge account so we can look at it.");
@@ -32,7 +37,24 @@ export function EarlyAccessSection() {
       return;
     }
     setError("");
-    setSubmitted(true);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/early-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account: acct, email: email.trim(), frequency: freq, painPoint: pain, wantsBeta: beta, website }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.error || "Something went wrong. Please try again.");
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError("Something went wrong. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const acct = account.trim();
@@ -154,9 +176,21 @@ export function EarlyAccessSection() {
               </div>
             </div>
 
+            {/* Honeypot: real users never see this field at all. */}
+            <input
+              type="text"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className={styles.honeypot}
+            />
+
             <div className={styles.submitRow}>
-              <button type="button" onClick={handleSubmit} className={styles.submitButton}>
-                Get early access
+              <button type="button" onClick={handleSubmit} disabled={submitting} className={styles.submitButton}>
+                {submitting ? "Sending…" : "Get early access"}
               </button>
               {error && <span className={styles.errorText}>{error}</span>}
             </div>

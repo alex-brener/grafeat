@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logEvent } from "@/lib/logger";
 import { INSTAGRAM_OAUTH_STATE_COOKIE, finalizeCallbackResponse, verifyOAuthState } from "@/lib/oauth";
+import { auth } from "@/lib/auth";
+import { getDb } from "@/lib/db/client";
+import { consumeConnectIntent } from "@/lib/oauth-connect-intent";
+import { assertWorkspaceMembership, ForbiddenError } from "@/lib/workspace";
+import { upsertMetaConnection } from "@/lib/meta-connection";
 
 export const runtime = "nodejs";
 
@@ -27,6 +32,52 @@ export async function GET(req: NextRequest) {
       NextResponse.json({ error: "Invalid or expired state" }, { status: 400 }),
       INSTAGRAM_OAUTH_STATE_COOKIE
     );
+  }
+
+  // Second, independent check: which workspace/user does this nonce actually
+  // belong to? Never derived from the `state` value itself (attacker-visible
+  // and attacker-replayable) — looked up server-side and consumed exactly
+  // once. A missing/expired/already-used intent is rejected the same way a
+  // bad CSRF state is, even though the cookie check above already passed.
+  const db = getDb();
+  const intent = stateParam ? await consumeConnectIntent(db, stateParam) : null;
+  if (!intent || intent.provider !== "instagram_login") {
+    await logEvent({
+      testCaseId: "auth.instagram_login.invalid_intent",
+      endpoint: "/api/auth/instagram/callback",
+      method: "GET",
+      status: "error",
+      response: { error: "invalid_or_expired_connect_intent" },
+      result: "FAIL",
+    });
+    return finalizeCallbackResponse(
+      NextResponse.json({ error: "Connect session expired or already used. Please try connecting again." }, { status: 400 }),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
+  }
+
+  // Lost/switched session between start and callback: require the same
+  // authenticated user to still be signed in, and re-verify membership
+  // directly rather than trusting the intent row alone (defense in depth —
+  // never attach a connection to a workspace without an explicit, current
+  // membership check).
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session || session.user.id !== intent.userId) {
+    return finalizeCallbackResponse(
+      NextResponse.redirect(new URL("/login?next=/dashboard&reason=session_lost", req.url)),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
+  }
+  try {
+    await assertWorkspaceMembership(db, session.user.id, intent.organizationId);
+  } catch (e) {
+    if (e instanceof ForbiddenError) {
+      return finalizeCallbackResponse(
+        NextResponse.json({ error: "Not authorized for this workspace" }, { status: 403 }),
+        INSTAGRAM_OAUTH_STATE_COOKIE
+      );
+    }
+    throw e;
   }
 
   if (errorParam) {
@@ -91,7 +142,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Step 2: exchange short-lived for a long-lived token, to test lifetime/refresh behavior.
+  // Step 2: exchange short-lived for a long-lived (~60 day) token — this is what gets stored.
   const longLivedUrl = new URL("https://graph.instagram.com/access_token");
   longLivedUrl.searchParams.set("grant_type", "ig_exchange_token");
   longLivedUrl.searchParams.set("client_secret", appSecret);
@@ -112,25 +163,23 @@ export async function GET(req: NextRequest) {
     latencyMs: Date.now() - longLivedStart,
   });
 
-  // Raw tokens are never included in this response, in any environment.
-  // Obtain ORGANIZER_ACCESS_TOKEN by running this flow against a local dev
-  // server (BASE_URL=http://localhost:... in .env.local) instead, and copy
-  // the token from there directly into Vercel's env var UI.
-  const safe = {
-    success: true,
-    instagramUserId: shortLived?.user_id,
-    permissionsRequested: shortLived?.permissions ?? null,
-    tokenType: longLived?.token_type ?? null,
-    expiresInSeconds: longLived?.expires_in ?? null,
-    accessTokenLength: longLived?.access_token?.length ?? null,
-    accessTokenPrefix: longLived?.access_token ? longLived.access_token.slice(0, 4) : null,
-  };
+  if (!longLivedRes.ok || !longLived?.access_token || !shortLived?.user_id) {
+    return finalizeCallbackResponse(
+      NextResponse.redirect(new URL("/dashboard?connectError=instagram_login", req.url)),
+      INSTAGRAM_OAUTH_STATE_COOKIE
+    );
+  }
+
+  await upsertMetaConnection(db, {
+    organizationId: intent.organizationId,
+    provider: "instagram_login",
+    igUserId: String(shortLived.user_id),
+    accessToken: longLived.access_token,
+    tokenExpiresAt: longLived.expires_in ? new Date(Date.now() + longLived.expires_in * 1000) : null,
+  });
 
   return finalizeCallbackResponse(
-    NextResponse.json({
-      note: "Raw tokens are not returned by this endpoint. Retrieve ORGANIZER_ACCESS_TOKEN by running this OAuth flow against a local dev server instead.",
-      ...safe,
-    }),
+    NextResponse.redirect(new URL("/dashboard?connected=instagram_login", req.url)),
     INSTAGRAM_OAUTH_STATE_COOKIE
   );
 }

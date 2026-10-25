@@ -222,6 +222,17 @@
   color: var(--color-error);
 }
 
+/* Honeypot — present in the DOM for bots that fill every input blind, but
+   invisible and unreachable for a real visitor (off-screen, not tabbable). */
+.honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  left: -9999px;
+}
+
 .thanks {
   flex: 1 1 440px;
   max-width: 620px;

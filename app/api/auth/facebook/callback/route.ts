@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logEvent } from "@/lib/logger";
 import { FACEBOOK_OAUTH_STATE_COOKIE, finalizeCallbackResponse, verifyOAuthState } from "@/lib/oauth";
+import { auth } from "@/lib/auth";
+import { getDb } from "@/lib/db/client";
+import { consumeConnectIntent } from "@/lib/oauth-connect-intent";
+import { assertWorkspaceMembership, ForbiddenError } from "@/lib/workspace";
+import { upsertMetaConnection } from "@/lib/meta-connection";
 
 export const runtime = "nodejs";
 
@@ -29,6 +34,52 @@ export async function GET(req: NextRequest) {
       NextResponse.json({ error: "Invalid or expired state" }, { status: 400 }),
       FACEBOOK_OAUTH_STATE_COOKIE
     );
+  }
+
+  // Second, independent check: which workspace/user does this nonce actually
+  // belong to? Never derived from the `state` value itself (attacker-visible
+  // and attacker-replayable) — looked up server-side and consumed exactly
+  // once. A missing/expired/already-used intent is rejected the same way a
+  // bad CSRF state is, even though the cookie check above already passed.
+  const db = getDb();
+  const intent = stateParam ? await consumeConnectIntent(db, stateParam) : null;
+  if (!intent || intent.provider !== "facebook_login") {
+    await logEvent({
+      testCaseId: "auth.facebook_login.invalid_intent",
+      endpoint: "/api/auth/facebook/callback",
+      method: "GET",
+      status: "error",
+      response: { error: "invalid_or_expired_connect_intent" },
+      result: "FAIL",
+    });
+    return finalizeCallbackResponse(
+      NextResponse.json({ error: "Connect session expired or already used. Please try connecting again." }, { status: 400 }),
+      FACEBOOK_OAUTH_STATE_COOKIE
+    );
+  }
+
+  // Lost/switched session between start and callback: require the same
+  // authenticated user to still be signed in, and re-verify membership
+  // directly rather than trusting the intent row alone (defense in depth —
+  // never attach a connection to a workspace without an explicit, current
+  // membership check).
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session || session.user.id !== intent.userId) {
+    return finalizeCallbackResponse(
+      NextResponse.redirect(new URL("/login?next=/dashboard&reason=session_lost", req.url)),
+      FACEBOOK_OAUTH_STATE_COOKIE
+    );
+  }
+  try {
+    await assertWorkspaceMembership(db, session.user.id, intent.organizationId);
+  } catch (e) {
+    if (e instanceof ForbiddenError) {
+      return finalizeCallbackResponse(
+        NextResponse.json({ error: "Not authorized for this workspace" }, { status: 403 }),
+        FACEBOOK_OAUTH_STATE_COOKIE
+      );
+    }
+    throw e;
   }
 
   if (errorParam) {
@@ -213,28 +264,31 @@ export async function GET(req: NextRequest) {
     pageIgLinks.push({ pageId: page.id, pageName: page.name, source: "me_accounts", ...igJson });
   }
 
-  // Raw tokens are never included in this response, in any environment.
-  // Obtain FACEBOOK_ORGANIZER_ACCESS_TOKEN by running this flow against a
-  // local dev server (BASE_URL=http://localhost:... in .env.local) instead,
-  // and copy the token from there directly into Vercel's env var UI.
-  const safe = {
-    success: true,
-    tokenType: token?.token_type ?? null,
-    expiresInSeconds: token?.expires_in ?? null,
-    accessTokenLength: token?.access_token?.length ?? null,
-    accessTokenPrefix: token?.access_token ? token.access_token.slice(0, 4) : null,
-  };
+  // Resolve the linked Instagram Business Account ID from whichever path
+  // found it (direct /me/accounts page, or the Business-Portfolio fallback).
+  // This is the graph.facebook.com-namespaced IG id (SPIKE-RESULTS.md §3.1) —
+  // not interchangeable with the Instagram Login flow's igUserId.
+  const resolvedIgId: string | undefined = pageIgLinks
+    .map((link: any) => link?.instagram_business_account?.id)
+    .find((id: unknown): id is string => typeof id === "string");
+
+  if (!token?.access_token || !resolvedIgId) {
+    return finalizeCallbackResponse(
+      NextResponse.redirect(new URL("/dashboard?connectError=facebook_login_no_ig_account", req.url)),
+      FACEBOOK_OAUTH_STATE_COOKIE
+    );
+  }
+
+  await upsertMetaConnection(db, {
+    organizationId: intent.organizationId,
+    provider: "facebook_login",
+    igUserId: resolvedIgId,
+    accessToken: token.access_token,
+    tokenExpiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000) : null,
+  });
 
   return finalizeCallbackResponse(
-    NextResponse.json({
-      note: "Raw tokens are not returned by this endpoint. Retrieve FACEBOOK_ORGANIZER_ACCESS_TOKEN by running this OAuth flow against a local dev server instead.",
-      ...safe,
-      grantedPermissions: permissions?.data,
-      pages: pages?.data,
-      businesses: (businesses as any)?.data,
-      businessOwnedPages,
-      pageIgLinks,
-    }),
+    NextResponse.redirect(new URL("/dashboard?connected=facebook_login", req.url)),
     FACEBOOK_OAUTH_STATE_COOKIE
   );
 }
