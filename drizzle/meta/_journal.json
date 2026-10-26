@@ -15,6 +15,13 @@
       "when": 1792941410340,
       "tag": "0001_early_access_and_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793015456360,
+      "tag": "0002_meta_connection_username",
+      "breakpoints": true
     }
   ]
 }

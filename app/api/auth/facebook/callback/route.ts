@@ -208,7 +208,10 @@ export async function GET(req: NextRequest) {
         const ownedUrl = new URL(
           `https://graph.facebook.com/${GRAPH_API_VERSION}/${business.id}/${edge}`
         );
-        ownedUrl.searchParams.set("fields", "id,name,instagram_business_account");
+        // Field expansion requests username alongside the id in one call
+        // (confirmed field name via Meta's IG User reference, Slice A.1) —
+        // no separate request needed.
+        ownedUrl.searchParams.set("fields", "id,name,instagram_business_account{id,username}");
         ownedUrl.searchParams.set("access_token", token.access_token);
         const ownedRes = await fetch(ownedUrl.toString());
         const ownedJson = await ownedRes.json();
@@ -218,7 +221,7 @@ export async function GET(req: NextRequest) {
           endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/{business-id}/${edge}`,
           method: "GET",
           apiVersion: GRAPH_API_VERSION,
-          params: { fields: "id,name,instagram_business_account" },
+          params: { fields: "id,name,instagram_business_account{id,username}" },
           accountIds: { businessId: business.id },
           status: ownedRes.status,
           response: ownedJson,
@@ -242,7 +245,7 @@ export async function GET(req: NextRequest) {
 
   for (const page of pages?.data ?? []) {
     const igUrl = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/${page.id}`);
-    igUrl.searchParams.set("fields", "instagram_business_account");
+    igUrl.searchParams.set("fields", "instagram_business_account{id,username}");
     igUrl.searchParams.set("access_token", token.access_token);
     const igStart = Date.now();
     const igRes = await fetch(igUrl.toString());
@@ -253,7 +256,7 @@ export async function GET(req: NextRequest) {
       endpoint: `https://graph.facebook.com/${GRAPH_API_VERSION}/{page-id}`,
       method: "GET",
       apiVersion: GRAPH_API_VERSION,
-      params: { fields: "instagram_business_account" },
+      params: { fields: "instagram_business_account{id,username}" },
       status: igRes.status,
       response: igJson,
       accountIds: { pageId: page.id },
@@ -268,9 +271,11 @@ export async function GET(req: NextRequest) {
   // found it (direct /me/accounts page, or the Business-Portfolio fallback).
   // This is the graph.facebook.com-namespaced IG id (SPIKE-RESULTS.md §3.1) —
   // not interchangeable with the Instagram Login flow's igUserId.
-  const resolvedIgId: string | undefined = pageIgLinks
-    .map((link: any) => link?.instagram_business_account?.id)
-    .find((id: unknown): id is string => typeof id === "string");
+  const resolvedAccount = pageIgLinks
+    .map((link: any) => link?.instagram_business_account)
+    .find((account: unknown): account is { id: string; username?: string } => typeof (account as any)?.id === "string");
+  const resolvedIgId = resolvedAccount?.id;
+  const resolvedUsername: string | null = typeof resolvedAccount?.username === "string" ? resolvedAccount.username : null;
 
   if (!token?.access_token || !resolvedIgId) {
     return finalizeCallbackResponse(
@@ -283,6 +288,7 @@ export async function GET(req: NextRequest) {
     organizationId: intent.organizationId,
     provider: "facebook_login",
     igUserId: resolvedIgId,
+    username: resolvedUsername,
     accessToken: token.access_token,
     tokenExpiresAt: token.expires_in ? new Date(Date.now() + token.expires_in * 1000) : null,
   });

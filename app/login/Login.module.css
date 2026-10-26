@@ -1,0 +1,139 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 20px 28px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 28px 80px;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+}
+
+.heading {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(30px, 4vw, 38px);
+}
+
+.lede {
+  margin: 0 0 32px;
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 15px;
+  box-sizing: border-box;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.input:hover {
+  border-color: var(--color-ink);
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--color-olive);
+  box-shadow: 0 0 0 3px rgba(92, 97, 39, 0.15);
+}
+
+.submitButton {
+  width: 100%;
+  height: 46px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 180ms ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.errorText {
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: var(--color-ink);
+  background: rgba(233, 183, 158, 0.25);
+  border: 1px solid rgba(233, 183, 158, 0.7);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.sentStatus {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+.sentStatus strong {
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input,
+  .submitButton {
+    transition: none;
+  }
+}

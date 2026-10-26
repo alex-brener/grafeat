@@ -1,9 +1,13 @@
+import Image from "next/image";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { getConnectionStatus } from "@/lib/meta-connection";
 import { ensureActiveWorkspace } from "@/lib/workspace-bootstrap";
+import { SignOutButton } from "./SignOutButton";
+import logoMark from "../icon.png";
+import styles from "./Dashboard.module.css";
 
 export default async function DashboardPage({
   searchParams,
@@ -27,61 +31,113 @@ export default async function DashboardPage({
       ])
     : [null, null];
 
+  const hasAnyConnection = Boolean(facebook || instagram);
+
   return (
-    <main style={{ maxWidth: 640, margin: "60px auto", padding: "0 24px", fontFamily: "var(--font-albert-sans, system-ui)" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 4 }}>{workspace?.name ?? "Your workspace"}</h1>
-      <p style={{ color: "#555", marginBottom: 32 }}>Signed in as {session.user.email}</p>
-
-      {connected && (
-        <p role="status" style={{ color: "#166534", marginBottom: 16 }}>
-          Connected {connected === "facebook_login" ? "Facebook Login" : "Instagram Login"} successfully.
-        </p>
-      )}
-      {connectError && (
-        <p role="alert" style={{ color: "#b00020", marginBottom: 16 }}>
-          Connecting failed ({connectError}). {connectError === "facebook_login_no_ig_account"
-            ? "No Instagram Business account was found linked to a Facebook Page you manage."
-            : "Please try again."}
-        </p>
-      )}
-
-      <section style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18 }}>Instagram connections</h2>
-        <ConnectionRow
-          label="Instagram Login"
-          status={instagram}
-          startHref="/api/auth/instagram/start"
-        />
-        <ConnectionRow
-          label="Facebook Login"
-          status={facebook}
-          startHref="/api/auth/facebook/start"
-        />
-      </section>
-    </main>
-  );
-}
-
-function ConnectionRow({
-  label,
-  status,
-  startHref,
-}: {
-  label: string;
-  status: { status: string; igUserId: string; updatedAt: Date } | null;
-  startHref: string;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #eee" }}>
-      <div>
-        <strong>{label}</strong>
-        <div style={{ fontSize: 14, color: "#666" }}>
-          {status ? `${status.status} · IG account ${status.igUserId}` : "Not connected"}
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.logo}>
+          <Image src={logoMark} alt="" width={26} height={26} className={styles.logoMark} priority />
+          Grafeat
         </div>
-      </div>
-      <a href={startHref} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: 6, textDecoration: "none", color: "#111" }}>
-        {status ? "Reconnect" : "Connect"}
-      </a>
+        <div className={styles.spacer} />
+        <div className={styles.accountControls}>
+          <span>{session.user.email}</span>
+          <SignOutButton />
+        </div>
+      </header>
+
+      <main className={styles.main}>
+        <div>
+          <h1 className={styles.workspaceHeading}>{workspace?.name ?? "Your workspace"}</h1>
+          <p className={styles.workspaceSub}>Signed in as {session.user.email}</p>
+        </div>
+
+        {connected && (
+          <p role="status" className={`${styles.banner} ${styles.bannerSuccess}`}>
+            Connected successfully.
+          </p>
+        )}
+        {connectError && (
+          <p role="alert" className={`${styles.banner} ${styles.bannerError}`}>
+            Connecting failed.{" "}
+            {connectError === "facebook_login_no_ig_account"
+              ? "No Instagram Professional account was found linked to a Facebook Page you manage."
+              : "Please try again."}
+          </p>
+        )}
+
+        <section>
+          <h2 className={styles.sectionTitle}>Connect your Instagram account</h2>
+          <p className={styles.sectionIntro}>
+            Grafeat discovers and verifies challenge submissions through your Instagram account.
+          </p>
+
+          <div className={styles.primaryPanel}>
+            {facebook ? (
+              <div className={styles.connectedRow}>
+                <span className={styles.connectedMark}>✓</span>
+                <div className={styles.connectedText}>
+                  <span className={styles.connectedUsername}>
+                    {facebook.username ? `@${facebook.username}` : "Connected · username unavailable"}
+                  </span>
+                  <span className={styles.connectedMeta}>Connected via Facebook</span>
+                </div>
+                <a href="/api/auth/facebook/start" className={styles.reconnectLink}>
+                  Reconnect
+                </a>
+              </div>
+            ) : (
+              <>
+                <p className={styles.primaryPanelBody}>
+                  Authorization happens through Facebook and requires an Instagram Professional
+                  account connected to a Facebook Page.
+                </p>
+                <a href="/api/auth/facebook/start" className={styles.primaryCta}>
+                  Connect with Facebook
+                </a>
+              </>
+            )}
+          </div>
+
+          <details className={styles.advanced}>
+            <summary className={styles.advancedSummary}>Advanced: Instagram Login (development)</summary>
+            <div className={styles.advancedBody}>
+              <p className={styles.advancedNote}>
+                A separate, direct Instagram sign-in path used for development and testing. Most
+                organizers should use the Facebook option above.
+              </p>
+              <div className={styles.connectionRow}>
+                <div>
+                  <div className={styles.connectionRowLabel}>
+                    {instagram
+                      ? instagram.username
+                        ? `@${instagram.username}`
+                        : "Connected · username unavailable"
+                      : "Not connected"}
+                  </div>
+                  {instagram && <div className={styles.connectionRowMeta}>Connected via Instagram Login</div>}
+                </div>
+                <a href="/api/auth/instagram/start" className={styles.secondaryLink}>
+                  {instagram ? "Reconnect" : "Connect"}
+                </a>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section>
+          <h2 className={styles.sectionTitle}>Challenges</h2>
+          <div className={styles.emptyState}>
+            <h3 className={styles.emptyStateHeading}>No challenges yet</h3>
+            <p className={styles.emptyStateBody}>
+              {hasAnyConnection
+                ? "You're connected. Challenge creation is coming in the next milestone — once a challenge exists, Grafeat will start discovering and verifying submissions automatically."
+                : "Connect your Instagram account above to get started. Once connected, you'll be able to set up a challenge here."}
+            </p>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

@@ -19,6 +19,8 @@ export async function upsertMetaConnection(
     organizationId: string;
     provider: MetaProvider;
     igUserId: string;
+    /** Best-effort — a failed username lookup must never block the connection itself. */
+    username: string | null;
     accessToken: string;
     tokenExpiresAt: Date | null;
   }
@@ -31,6 +33,7 @@ export async function upsertMetaConnection(
       organizationId: params.organizationId,
       provider: params.provider,
       igUserId: params.igUserId,
+      username: params.username,
       encryptedAccessToken: encrypted.ciphertext,
       tokenIv: encrypted.iv,
       tokenAuthTag: encrypted.authTag,
@@ -42,6 +45,7 @@ export async function upsertMetaConnection(
       target: [metaConnection.organizationId, metaConnection.provider],
       set: {
         igUserId: params.igUserId,
+        username: params.username,
         encryptedAccessToken: encrypted.ciphertext,
         tokenIv: encrypted.iv,
         tokenAuthTag: encrypted.authTag,
@@ -58,6 +62,7 @@ export async function getConnectionStatus(db: AppDb, organizationId: string, pro
     .select({
       provider: metaConnection.provider,
       igUserId: metaConnection.igUserId,
+      username: metaConnection.username,
       status: metaConnection.status,
       tokenExpiresAt: metaConnection.tokenExpiresAt,
       lastVerifiedAt: metaConnection.lastVerifiedAt,

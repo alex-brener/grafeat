@@ -28,6 +28,10 @@ export const metaConnection = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     provider: metaProviderEnum("provider").notNull(),
     igUserId: text("ig_user_id").notNull(),
+    // Nullable: a username lookup can fail independently of the connection
+    // itself (Slice A.1) — the connection must still succeed, and existing
+    // rows from before this column existed have no value to backfill.
+    username: text("username"),
     // AES-256-GCM components — see lib/token-crypto.ts. Never store a raw token.
     encryptedAccessToken: text("encrypted_access_token").notNull(),
     tokenIv: text("token_iv").notNull(),

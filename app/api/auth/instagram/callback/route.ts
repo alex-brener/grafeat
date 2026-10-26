@@ -170,10 +170,36 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Best-effort username lookup (Slice A.1) — confirmed working pattern:
+  // GET graph.instagram.com/{version}/me?fields=id,username with the IG
+  // user's own long-lived token. A failure here must not block the
+  // connection itself; the row is stored with username=null either way.
+  const usernameStart = Date.now();
+  const usernameUrl = new URL("https://graph.instagram.com/v21.0/me");
+  usernameUrl.searchParams.set("fields", "id,username");
+  usernameUrl.searchParams.set("access_token", longLived.access_token);
+  const usernameRes = await fetch(usernameUrl.toString()).catch(() => null);
+  const usernameJson = usernameRes ? await usernameRes.json().catch(() => null) : null;
+
+  await logEvent({
+    testCaseId: "auth.instagram_login.fetch_username",
+    endpoint: "https://graph.instagram.com/v21.0/me",
+    method: "GET",
+    params: { fields: "id,username" },
+    status: usernameRes?.status ?? "no_response",
+    response: usernameJson,
+    result: usernameRes?.ok && usernameJson?.username ? "PASS" : "FAIL",
+    latencyMs: Date.now() - usernameStart,
+  });
+
+  const username: string | null =
+    typeof usernameJson?.username === "string" ? usernameJson.username : null;
+
   await upsertMetaConnection(db, {
     organizationId: intent.organizationId,
     provider: "instagram_login",
     igUserId: String(shortLived.user_id),
+    username,
     accessToken: longLived.access_token,
     tokenExpiresAt: longLived.expires_in ? new Date(Date.now() + longLived.expires_in * 1000) : null,
   });

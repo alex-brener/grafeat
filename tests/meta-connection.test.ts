@@ -27,6 +27,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "facebook_login",
       igUserId: "ig-12345",
+      username: null,
       accessToken: "EAABsbCS-real-looking-token-value",
       tokenExpiresAt: null,
     });
@@ -43,6 +44,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "facebook_login",
       igUserId: "ig-old",
+      username: null,
       accessToken: "token-old",
       tokenExpiresAt: null,
     });
@@ -50,6 +52,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "facebook_login",
       igUserId: "ig-new",
+      username: null,
       accessToken: "token-new",
       tokenExpiresAt: null,
     });
@@ -64,6 +67,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "facebook_login",
       igUserId: "ig-fb-namespace",
+      username: null,
       accessToken: "fb-token",
       tokenExpiresAt: null,
     });
@@ -71,6 +75,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "instagram_login",
       igUserId: "ig-instagram-namespace",
+      username: null,
       accessToken: "ig-token",
       tokenExpiresAt: null,
     });
@@ -84,6 +89,7 @@ describe("meta connection persistence", () => {
       organizationId: "org-a",
       provider: "facebook_login",
       igUserId: "ig-12345",
+      username: null,
       accessToken: "super-secret-token",
       tokenExpiresAt: null,
     });
@@ -97,5 +103,56 @@ describe("meta connection persistence", () => {
   it("returns null for a provider that was never connected", async () => {
     const status = await getConnectionStatus(ctx.db, "org-a", "instagram_login");
     expect(status).toBeNull();
+  });
+
+  it("persists and returns the username when the lookup succeeded", async () => {
+    await upsertMetaConnection(ctx.db, {
+      organizationId: "org-a",
+      provider: "facebook_login",
+      igUserId: "ig-12345",
+      username: "the_calligrail",
+      accessToken: "token",
+      tokenExpiresAt: null,
+    });
+
+    const status = await getConnectionStatus(ctx.db, "org-a", "facebook_login");
+    expect(status?.username).toBe("the_calligrail");
+  });
+
+  it("allows a null username (graceful fallback when the lookup failed) without failing the connection", async () => {
+    await upsertMetaConnection(ctx.db, {
+      organizationId: "org-a",
+      provider: "instagram_login",
+      igUserId: "ig-67890",
+      username: null,
+      accessToken: "token",
+      tokenExpiresAt: null,
+    });
+
+    const status = await getConnectionStatus(ctx.db, "org-a", "instagram_login");
+    expect(status).not.toBeNull();
+    expect(status?.username).toBeNull();
+  });
+
+  it("updates the username on reconnect", async () => {
+    await upsertMetaConnection(ctx.db, {
+      organizationId: "org-a",
+      provider: "facebook_login",
+      igUserId: "ig-12345",
+      username: "old_handle",
+      accessToken: "token-1",
+      tokenExpiresAt: null,
+    });
+    await upsertMetaConnection(ctx.db, {
+      organizationId: "org-a",
+      provider: "facebook_login",
+      igUserId: "ig-12345",
+      username: "new_handle",
+      accessToken: "token-2",
+      tokenExpiresAt: null,
+    });
+
+    const status = await getConnectionStatus(ctx.db, "org-a", "facebook_login");
+    expect(status?.username).toBe("new_handle");
   });
 });

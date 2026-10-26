@@ -1,0 +1,345 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+.header {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+
+.logoMark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.accountControls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.signOutButton {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.signOutButton:hover:not(:disabled) {
+  background: var(--color-border);
+  border-color: var(--color-ink);
+}
+
+.signOutButton:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.signOutButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 36px 28px 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.workspaceHeading {
+  margin: 0 0 4px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 4vw, 36px);
+}
+
+.workspaceSub {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.banner {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.bannerSuccess {
+  background: rgba(92, 97, 39, 0.1);
+  border: 1px solid rgba(92, 97, 39, 0.3);
+  color: var(--color-olive);
+}
+
+.bannerError {
+  background: rgba(233, 183, 158, 0.25);
+  border: 1px solid rgba(233, 183, 158, 0.7);
+  color: var(--color-ink);
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 22px;
+}
+
+.sectionIntro {
+  margin: 0 0 16px;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+  max-width: 560px;
+}
+
+/* --- Primary connect panel (Facebook Login) --- */
+
+.primaryPanel {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  padding: 24px;
+}
+
+.primaryPanelBody {
+  margin: 8px 0 18px;
+  color: var(--color-text);
+  font-size: 14.5px;
+  max-width: 480px;
+  text-wrap: pretty;
+}
+
+.primaryCta {
+  display: inline-flex;
+  align-items: center;
+  height: 46px;
+  padding: 0 20px;
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+  transition: opacity 180ms ease;
+}
+
+.primaryCta:hover {
+  color: var(--color-olive);
+  opacity: 0.85;
+}
+
+.primaryCta:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.connectedRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.connectedMark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-olive-light);
+  color: var(--color-ink-dark);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connectedText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.connectedUsername {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.connectedMeta {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.reconnectLink {
+  margin-left: auto;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-olive);
+  text-decoration: none;
+  border-radius: 3px;
+  transition: color 180ms ease;
+}
+
+.reconnectLink:hover {
+  color: var(--color-ink);
+}
+
+.reconnectLink:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+/* --- Secondary / advanced (Instagram Login) --- */
+
+.advanced {
+  margin-top: 16px;
+}
+
+.advancedSummary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  user-select: none;
+}
+
+.advancedSummary:hover {
+  color: var(--color-ink);
+}
+
+.advancedBody {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.advancedNote {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.connectionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.connectionRowLabel {
+  font-size: 13.5px;
+}
+
+.connectionRowMeta {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.secondaryLink {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-ink);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.secondaryLink:hover {
+  background: var(--color-border);
+  border-color: var(--color-ink);
+}
+
+.secondaryLink:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+/* --- Challenges empty state --- */
+
+.emptyState {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  padding: 28px;
+  text-align: left;
+}
+
+.emptyStateHeading {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 22px;
+}
+
+.emptyStateBody {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14.5px;
+  max-width: 480px;
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signOutButton,
+  .primaryCta,
+  .reconnectLink,
+  .secondaryLink,
+  .advancedSummary {
+    transition: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .connectedRow {
+    align-items: flex-start;
+  }
+
+  .reconnectLink {
+    margin-left: 0;
+  }
+
+  .connectionRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

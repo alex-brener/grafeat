@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
+import logoMark from "../icon.png";
+import styles from "./Login.module.css";
 
 /**
  * Email magic-link sign-in only for Slice A (Google is deferred — see
@@ -31,44 +34,49 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: "80px auto", padding: "0 24px", fontFamily: "var(--font-albert-sans, system-ui)" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Sign in to Grafeat</h1>
-      <p style={{ color: "#555", marginBottom: 32 }}>
-        We&apos;ll email you a link — no password needed.
-      </p>
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <a href="/" className={styles.logo}>
+          <Image src={logoMark} alt="" width={26} height={26} className={styles.logoMark} priority />
+          Grafeat
+        </a>
+      </header>
 
-      {status === "sent" ? (
-        <p role="status">
-          Check <strong>{email}</strong> for a sign-in link. It expires in 5 minutes.
-        </p>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="email" style={{ display: "block", marginBottom: 8 }}>
-            Email address
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: "100%", padding: 10, fontSize: 16, marginBottom: 16, boxSizing: "border-box" }}
-            placeholder="you@example.com"
-          />
-          <button
-            type="submit"
-            disabled={status === "sending"}
-            style={{ width: "100%", padding: 12, fontSize: 16, cursor: "pointer" }}
-          >
-            {status === "sending" ? "Sending…" : "Send sign-in link"}
-          </button>
-          {status === "error" && (
-            <p role="alert" style={{ color: "#b00020", marginTop: 12 }}>
-              {errorMessage}
+      <main className={styles.main}>
+        <div className={styles.card}>
+          <h1 className={styles.heading}>Sign in to Grafeat</h1>
+          <p className={styles.lede}>We&apos;ll email you a link — no password needed.</p>
+
+          {status === "sent" ? (
+            <p role="status" className={styles.sentStatus}>
+              Check <strong>{email}</strong> for a sign-in link. It expires in 5 minutes.
             </p>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <label htmlFor="email" className={styles.field}>
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={styles.input}
+                placeholder="you@example.com"
+              />
+              <button type="submit" disabled={status === "sending"} className={styles.submitButton}>
+                {status === "sending" ? "Sending…" : "Send sign-in link"}
+              </button>
+              {status === "error" && (
+                <p role="alert" className={styles.errorText}>
+                  {errorMessage}
+                </p>
+              )}
+            </form>
           )}
-        </form>
-      )}
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }
