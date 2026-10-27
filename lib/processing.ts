@@ -172,6 +172,15 @@ async function recordTransientFailure(db: AppDb, submissionId: string, nextRetry
  * remaining budget on its backlog ordered by the permanent random
  * `allocationRank` — never by publish time or discovery order.
  *
+ * Both the day-selection and candidate-selection queries require
+ * `dateEligible = true` — a submission published outside the challenge's
+ * configured date range can never become gallery-eligible regardless of its
+ * mention result, so it must never be allocated, verified, or charged
+ * against a day's processing_budget. It stays `pending` indefinitely
+ * (visible in diagnostics, never silently dropped) rather than consuming
+ * the monetized resource for an evaluation that can't produce a usable
+ * result.
+ *
  * Throws MetaGraphError for token_invalid/permissions — the caller must
  * stop the whole sync and surface a reconnection/permissions message,
  * never retry these per-submission (no individual retryCount increment).
@@ -192,7 +201,7 @@ export async function runProcessing(
   const daysRows = await db
     .selectDistinct({ challengeLocalDay: submission.challengeLocalDay })
     .from(submission)
-    .where(and(eq(submission.challengeId, challenge.id), eq(submission.processingStatus, "pending")))
+    .where(and(eq(submission.challengeId, challenge.id), eq(submission.processingStatus, "pending"), eq(submission.dateEligible, true)))
     .orderBy(desc(submission.challengeLocalDay));
   const eligibleDays = daysRows
     .map((r) => r.challengeLocalDay)
@@ -206,7 +215,14 @@ export async function runProcessing(
     const candidates = await db
       .select()
       .from(submission)
-      .where(and(eq(submission.challengeId, challenge.id), eq(submission.challengeLocalDay, localDay), eq(submission.processingStatus, "pending")))
+      .where(
+        and(
+          eq(submission.challengeId, challenge.id),
+          eq(submission.challengeLocalDay, localDay),
+          eq(submission.processingStatus, "pending"),
+          eq(submission.dateEligible, true)
+        )
+      )
       .orderBy(asc(submission.allocationRank));
 
     for (const candidate of candidates) {

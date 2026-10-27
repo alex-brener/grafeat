@@ -46,7 +46,7 @@ describe("runSync", () => {
     await upsertMetaConnection(ctx.db, { organizationId: "org-a", provider: "facebook_login", igUserId: "ig-1", username: "organizer", accessToken: "real-token", tokenExpiresAt: null });
     const result = await runSync(ctx.db, "challenge-a", () =>
       createFakeMetaGraphClient({
-        pages: { page1: { items: [{ id: "m1", timestamp: "2020-01-01T12:00:00Z" }], nextAfter: null } },
+        pages: { page1: { items: [{ id: "m1", timestamp: "2026-06-01T12:00:00Z" }], nextAfter: null } },
         mentions: { m1: { outcome: "verified", data: { username: "p1", caption: null, mediaType: null, mediaUrl: null, thumbnailUrl: null, permalink: null } } },
       })
     );

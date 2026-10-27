@@ -226,6 +226,253 @@
   text-align: right;
 }
 
+/* --- Gallery --- */
+
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.galleryCard {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.galleryImageWrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--color-border);
+}
+
+.galleryImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.galleryImageFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.galleryImageFallback a {
+  color: var(--color-olive);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.galleryCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.galleryCardMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.galleryCreator {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--color-ink);
+}
+
+.galleryDate {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.galleryPermalink {
+  font-size: 12.5px;
+  color: var(--color-olive);
+  text-decoration: none;
+}
+
+.galleryPermalink:hover {
+  text-decoration: underline;
+}
+
+.reviewBadge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.reviewBadge_unreviewed {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.reviewBadge_selected {
+  background: rgba(92, 97, 39, 0.18);
+  color: var(--color-olive);
+}
+
+.reviewBadge_rejected {
+  background: rgba(233, 183, 158, 0.35);
+  color: var(--color-ink);
+}
+
+.reviewControls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.reviewButtonSelect,
+.reviewButtonReject,
+.reviewButtonUndo {
+  flex: 1 1 auto;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 180ms ease, opacity 180ms ease;
+}
+
+.reviewButtonSelect:hover:not(:disabled) {
+  background: rgba(92, 97, 39, 0.12);
+  border-color: var(--color-olive);
+}
+
+.reviewButtonReject:hover:not(:disabled) {
+  background: rgba(233, 183, 158, 0.3);
+}
+
+.reviewButtonUndo:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.reviewButtonSelect:disabled,
+.reviewButtonReject:disabled,
+.reviewButtonUndo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.loadMoreRow {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* --- Diagnostics --- */
+
+.diagnosticsPanel {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  overflow: hidden;
+}
+
+.diagnosticsCategory {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diagnosticsCategory:last-child {
+  border-bottom: none;
+}
+
+.diagnosticsToggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: left;
+}
+
+.diagnosticsToggle:hover {
+  background: var(--color-border);
+}
+
+.diagnosticsCount {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--color-text-muted);
+}
+
+.diagnosticsBody {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diagnosticsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diagnosticsRow {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 13px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.diagnosticsRow:last-child {
+  border-bottom: none;
+}
+
+.diagnosticsStatus {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.diagnosticsRow a {
+  color: var(--color-olive);
+  text-decoration: none;
+  font-size: 12.5px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .breadcrumb,
   .input,

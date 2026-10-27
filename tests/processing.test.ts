@@ -325,4 +325,83 @@ describe("runProcessing", () => {
     expect(row.retryCount).toBe(0); // connection-wide failure — never charged to this candidate
     expect(row.processingStatus).toBe("pending");
   });
+
+  describe("date-ineligible candidates", () => {
+    it("never attempts mention verification for a date-ineligible pending submission", async () => {
+      await insertSubmission(ctx, {
+        id: "s-ineligible",
+        mediaId: "m-ineligible",
+        challengeLocalDay: ELAPSED_DAY,
+        publishedAt: new Date("2026-01-01T12:00:00Z"),
+        dateEligible: false,
+      });
+      const client = createFakeMetaGraphClient({
+        onFetchMentionedMedia: () => {
+          throw new Error("must never be called for a date-ineligible candidate");
+        },
+      });
+
+      const result = await runProcessing(ctx.db, client, "ig-1", baseChallenge(), FAR_FUTURE);
+      expect(result.attempted).toBe(0);
+      expect(result.completed).toBe(0);
+
+      const [row] = await ctx.db.select().from(submission).where(eq(submission.id, "s-ineligible"));
+      expect(row.processingStatus).toBe("pending"); // left alone, not silently dropped
+    });
+
+    it("never charges a day's processing_budget for a date-ineligible candidate, even when it shares a day with an eligible one", async () => {
+      await insertSubmission(ctx, {
+        id: "s-eligible",
+        mediaId: "m-eligible",
+        challengeLocalDay: ELAPSED_DAY,
+        publishedAt: new Date("2026-01-01T12:00:00Z"),
+        dateEligible: true,
+        allocationRank: 0.1,
+      });
+      await insertSubmission(ctx, {
+        id: "s-ineligible",
+        mediaId: "m-ineligible",
+        challengeLocalDay: ELAPSED_DAY,
+        publishedAt: new Date("2026-01-01T18:00:00Z"),
+        dateEligible: false,
+        allocationRank: 0.2,
+      });
+      const attemptedIds: string[] = [];
+      const client = createFakeMetaGraphClient({
+        mentions: { "m-eligible": { outcome: "verified", data: { username: "p1", caption: null, mediaType: null, mediaUrl: null, thumbnailUrl: null, permalink: null } } },
+        onFetchMentionedMedia: (mediaId) => attemptedIds.push(mediaId),
+      });
+
+      const result = await runProcessing(ctx.db, client, "ig-1", baseChallenge({ dailyProcessingCapacity: 10 }), FAR_FUTURE);
+      expect(attemptedIds).toEqual(["m-eligible"]); // the ineligible candidate was never even called
+      expect(result.completed).toBe(1);
+
+      const [budget] = await ctx.db.select().from(processingBudget);
+      expect(budget.consumed).toBe(1); // only the eligible evaluation was charged
+
+      const [ineligibleRow] = await ctx.db.select().from(submission).where(eq(submission.id, "s-ineligible"));
+      expect(ineligibleRow.processingStatus).toBe("pending");
+    });
+
+    it("a day whose entire backlog is date-ineligible is skipped — no budget row is even created for it", async () => {
+      await insertSubmission(ctx, {
+        id: "s-ineligible",
+        mediaId: "m-ineligible",
+        challengeLocalDay: ELAPSED_DAY,
+        publishedAt: new Date("2026-01-01T12:00:00Z"),
+        dateEligible: false,
+      });
+      const client = createFakeMetaGraphClient({
+        onFetchMentionedMedia: () => {
+          throw new Error("must never be called");
+        },
+      });
+
+      const result = await runProcessing(ctx.db, client, "ig-1", baseChallenge({ dailyProcessingCapacity: 5 }), FAR_FUTURE);
+      expect(result.attempted).toBe(0);
+
+      const budgets = await ctx.db.select().from(processingBudget);
+      expect(budgets).toHaveLength(0);
+    });
+  });
 });

@@ -4,11 +4,14 @@ import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { getChallenge } from "@/lib/challenge";
 import { getChallengeSyncStats } from "@/lib/sync-stats";
+import { getGallerySubmissions, getDiagnosticSummary } from "@/lib/submission-gallery";
 import { deriveChallengeStatus } from "@/lib/timezone";
 import { ensureActiveWorkspace } from "@/lib/workspace-bootstrap";
 import { DashboardShell } from "../../DashboardShell";
 import { ChallengeForm } from "../ChallengeForm";
 import { SyncButton } from "../SyncButton";
+import { SubmissionGallery } from "../SubmissionGallery";
+import { DiagnosticsPanel } from "../DiagnosticsPanel";
 import dashboardStyles from "../../Dashboard.module.css";
 import styles from "../Challenges.module.css";
 
@@ -31,7 +34,16 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
   }
 
   const displayStatus = deriveChallengeStatus(c.status, c.endDate, c.timezone);
-  const stats = await getChallengeSyncStats(getDb(), c.id);
+  const db = getDb();
+  const stats = await getChallengeSyncStats(db, c.id);
+
+  const galleryPage = await getGallerySubmissions(db, workspace.id, c.id, null);
+  const galleryItems = galleryPage.outcome === "ok" ? galleryPage.items.map((item) => ({ ...item, publishedAt: item.publishedAt.toISOString() })) : [];
+  const galleryNextCursor = galleryPage.outcome === "ok" ? galleryPage.nextCursor : null;
+
+  const diagnosticsSummary = await getDiagnosticSummary(db, workspace.id, c.id);
+  const diagnosticsCounts =
+    diagnosticsSummary.outcome === "ok" ? diagnosticsSummary.counts : { pending: 0, technical_failure: 0, not_verified: 0, outside_dates: 0 };
 
   return (
     <DashboardShell email={session.user.email}>
@@ -99,6 +111,17 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
           </p>
         )}
         <SyncButton challengeId={c.id} />
+      </section>
+
+      <section>
+        <h2 className={dashboardStyles.sectionTitle}>Gallery</h2>
+        <SubmissionGallery challengeId={c.id} initialItems={galleryItems} initialNextCursor={galleryNextCursor} />
+      </section>
+
+      <section>
+        <h2 className={dashboardStyles.sectionTitle}>Diagnostics</h2>
+        <p className={styles.sub}>Submissions not yet in the gallery, grouped by why — read-only.</p>
+        <DiagnosticsPanel challengeId={c.id} initialCounts={diagnosticsCounts} />
       </section>
 
       <section>
