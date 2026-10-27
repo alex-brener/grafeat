@@ -1,0 +1,1 @@
+ALTER TABLE "submission" ADD COLUMN "retry_not_before_at" timestamp;

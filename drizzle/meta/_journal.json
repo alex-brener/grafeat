@@ -22,6 +22,27 @@
       "when": 1793015456360,
       "tag": "0002_meta_connection_username",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793100757461,
+      "tag": "0003_challenges_and_submissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793101763754,
+      "tag": "0004_discovery_cursor",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793108445034,
+      "tag": "0005_retry_not_before",
+      "breakpoints": true
     }
   ]
 }

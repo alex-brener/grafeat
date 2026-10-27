@@ -3,3 +3,8 @@ export * from "./meta-connection";
 export * from "./oauth-connect-intent";
 export * from "./early-access-signup";
 export * from "./rate-limit-bucket";
+export * from "./challenge";
+export * from "./submission";
+export * from "./sync-run";
+export * from "./sync-lease";
+export * from "./processing-budget";

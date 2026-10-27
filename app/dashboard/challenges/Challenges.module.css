@@ -1,0 +1,252 @@
+.breadcrumb {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  border-radius: 3px;
+  transition: color 180ms ease;
+}
+
+.breadcrumb:hover {
+  color: var(--color-ink);
+}
+
+.breadcrumb:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+.heading {
+  margin: 0 0 4px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(28px, 4vw, 36px);
+}
+
+.sub {
+  margin: 0 0 24px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.card {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-card-paper);
+  padding: 24px;
+}
+
+/* --- List --- */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.listRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.listRowName {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-ink);
+}
+
+.listRowMeta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* --- Form --- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 480px;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.field {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.input,
+.select {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 400;
+  box-sizing: border-box;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.input:hover,
+.select:hover {
+  border-color: var(--color-ink);
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  outline: none;
+  border-color: var(--color-olive);
+  box-shadow: 0 0 0 3px rgba(92, 97, 39, 0.15);
+}
+
+.hint {
+  font-weight: 400;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.submitButton {
+  align-self: flex-start;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 180ms ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.submitButton:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 2px;
+}
+
+.submitButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.errorText {
+  font-size: 13.5px;
+  color: var(--color-ink);
+  background: rgba(233, 183, 158, 0.25);
+  border: 1px solid rgba(233, 183, 158, 0.7);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.syncMessage {
+  margin: 10px 0 0;
+}
+
+/* --- Stats grid (discovery/processing progress) --- */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.statTile {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.statValue {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.statLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* --- Detail view --- */
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.detailRow:last-child {
+  border-bottom: none;
+}
+
+.detailLabel {
+  color: var(--color-text-muted);
+}
+
+.detailValue {
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breadcrumb,
+  .input,
+  .select,
+  .submitButton {
+    transition: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .listRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detailRow {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detailValue {
+    text-align: left;
+  }
+}

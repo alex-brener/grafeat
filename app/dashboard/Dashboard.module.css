@@ -312,11 +312,71 @@
 }
 
 .emptyStateBody {
-  margin: 0;
+  margin: 0 0 16px;
   color: var(--color-text);
   font-size: 14.5px;
   max-width: 480px;
   text-wrap: pretty;
+}
+
+/* --- Challenge summary list (dashboard home) + shared status badge --- */
+
+.challengeSummaryList {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.challengeSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.challengeSummaryName {
+  color: var(--color-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+  border-radius: 3px;
+  transition: color 180ms ease;
+}
+
+.challengeSummaryName:hover {
+  color: var(--color-olive);
+}
+
+.challengeSummaryName:focus-visible {
+  outline: 2px solid var(--color-olive);
+  outline-offset: 3px;
+}
+
+.statusBadge {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.statusBadge_draft {
+  background: var(--color-badge-neutral-bg);
+  color: var(--color-text-muted);
+}
+
+.statusBadge_active {
+  background: var(--color-badge-olive-bg);
+  color: var(--color-badge-olive-text);
+}
+
+.statusBadge_ended {
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -324,7 +384,8 @@
   .primaryCta,
   .reconnectLink,
   .secondaryLink,
-  .advancedSummary {
+  .advancedSummary,
+  .challengeSummaryName {
     transition: none;
   }
 }
