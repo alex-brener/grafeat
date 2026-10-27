@@ -143,17 +143,52 @@ Every finding below is therefore sourced from **narrative documentation or the c
 - **Evidence source:** `prompts/grafeat-instagram-submission-discovery.md` §2C.
 - **Confidence:** [REPORTED — not retained], consistent with [VERIFIED — documented] Experiment 6.
 
+## 11. Live hashtag discovery + mention verification + media-availability experiment (newest, independently re-verifiable)
+
+- **Purpose:** The Slice B "required technical discovery gate" — determine whether hashtag discovery, genuine-mention verification, and usable artwork imagery are all actually available through the production `lib/meta-graph.ts` client, using a dedicated, controlled test hashtag rather than a busy real one.
+- **Date:** 2026-10-27.
+- **Account/token context:** The connected `facebook_login` organizer connection for `@the_calligrail` (`igUserId 17841457665709817`), read from the live `meta_connection` table and decrypted the same way production code does. Hashtag: `#grafeattest2026` (dedicated, created solely for this test — not a busy real-world hashtag like `#inktober`, unlike Experiments 8–9).
+- **Test posts:** Post A — public Personal account `@cc_spike_participant`, caption `"#grafeattest2026 the_calligrail"` (genuine mention). Post B — a different public Personal account, caption `"#grafeattest2026"` only (no mention).
+- **Request pattern (real, via `lib/meta-graph.ts`, not placeholders):**
+  ```
+  GET https://graph.facebook.com/v21.0/ig_hashtag_search?user_id=17841457665709817&q=grafeattest2026
+  GET https://graph.facebook.com/v21.0/{hashtag_id}/recent_media?user_id=17841457665709817&fields=id,caption,media_type,permalink,timestamp&limit=50
+  GET https://graph.facebook.com/v21.0/17841457665709817?fields=mentioned_media.media_id({media_id}){username,caption,media_type,media_url,thumbnail_url,permalink}
+  ```
+- **Observed outcome — hashtag resolution + discovery:** PASS. `ig_hashtag_search` resolved to `hashtagId 18410775676092331`. `recent_media` returned exactly 2 items (both test posts, nothing else — confirming the dedicated-hashtag approach avoids noise), on the first page, immediately after publication — no indexing delay observed.
+- **Observed outcome — genuine mention verification (Post A):** PASS, HTTP 200. `mentioned_media.media_id(...)` returned a populated object: `username: "cc_spike_participant"`, `caption`, `media_type: "IMAGE"`, `media_url` (a real `scontent.cdninstagram.com` signed CDN URL), `permalink`. No `thumbnail_url` for this `IMAGE`-type post.
+- **Observed outcome — non-mention rejection (Post B) — the key finding:** Initially surfaced as a thrown `permissions`-classified error from `lib/meta-graph.ts`, not a clean rejection. The **raw** (unclassified) response, captured directly:
+  ```json
+  {
+    "error": {
+      "message": "(#10) User is not mentioned in the caption.",
+      "type": "OAuthException",
+      "code": 10,
+      "fbtrace_id": "A33sGisMt3bX1VFx3OaNXN8"
+    }
+  }
+  ```
+  This is Meta's actual, confirmed signal for "this media does not mention the organizer" — an HTTP 400/code-10/OAuthException error, not a 200 with an empty object (the previously untested assumption baked into the original implementation). **This is a genuinely new finding, not previously documented anywhere in this project's history** — Experiments 3 and 9 above only ever tested the *positive* (genuine-mention) case.
+- **Fix applied as a direct result:** `lib/meta-graph.ts`'s error classifier now recognizes this exact message pattern as a dedicated `not_mentioned` kind, checked *before* the generic code-10-permissions rule, and `fetchMentionedMedia` translates it back into a normal `{outcome: "not_mentioned"}` return — never surfaced as an error to the processing engine. Reproduced in `tests/meta-graph.test.ts` with the exact captured response above. Re-ran live after the fix: Post B now correctly resolves to `not_mentioned`.
+- **Observed outcome — media URL reachability:** PASS. A real `HEAD` request against Post A's `media_url` returned HTTP 200, `content-type: image/jpeg`, `content-length: 12831` — confirmed to be an actual loadable image, not just a present-but-unverified string.
+- **Evidence source:** This project's own Slice B conversation record, 2026-10-27 — raw request/response captured directly during the test (the first entry in this document with a genuinely captured, re-run-confirmed payload, not a narrative secondhand report).
+- **Confidence:** **[VERIFIED — directly captured and independently re-run after the fix]**, the strongest evidence tier in this document.
+- **Explicit scope limits — do not over-read this result:**
+  1. **External-organizer Advanced Access remains unconfirmed.** This is the same single development connection used throughout the project (same as Experiments 1–10). It does not resolve the Experiment 7 vs. 8/9 tension described below — Meta could still reject this same call for a different organizer or a different app review state.
+  2. **Post A's author, `@cc_spike_participant`, is the same account already connected to this Meta app via Instagram Login** (Experiment 1 / `docs/HANDOVER.md` §4) — not a fully arms-length, never-before-seen account. This doesn't invalidate the technical finding, but "verified for a genuinely unrelated participant" is still not independently established.
+  3. **The returned `media_url` carries signed/expiring query parameters** (`oe=`, `oh=`, `_nc_*`) — must not be assumed permanent.
+
 ---
 
 ## Working API access vs. approved Advanced Access — do not conflate these
 
-Experiments 8 and 9 are evidence that specific Graph API calls **worked** when tried. Experiment 7 is evidence that Meta **explicitly rejected** `ig_hashtag_search` pending "Instagram Public Content Access" review, as of the last point this was recorded in `DECISION.md`.
+Experiments 8, 9, and now **11** are evidence that specific Graph API calls **worked** when tried — 11 being the strongest tier, since it's the first of these to be directly captured and independently re-run in this project's own history rather than reported secondhand. Experiment 7 is evidence that Meta **explicitly rejected** `ig_hashtag_search` pending "Instagram Public Content Access" review, as of the last point this was recorded in `DECISION.md`.
 
-**These are two different claims, and neither resolves the other:**
+**These remain two different claims, and Experiment 11 does not resolve the gap either:**
 - Whether a specific API call returned real data under whatever access conditions it was tried with ([REPORTED]/[VERIFIED] above) is **not the same fact** as whether Meta has formally granted Advanced Access that would extend to **arbitrary external Grafeat organizers and arbitrary public hashtags in production**.
-- Both being true simultaneously is possible (Advanced Access may have been granted between `DECISION.md` and the newer brief). It is equally possible the newer tests used a different access path (a developer/admin-role account, a specific token, a narrower or temporary allowance) that would not automatically extend to production use by external customers.
-- **This document, and the rest of this repository, does not contain the information needed to determine which.** Confirm current Advanced Access status directly in the Meta App Dashboard before relying on hashtag search as a production discovery mechanism for external organizers. See `HANDOVER.md` Section 6 for the same distinction applied to the overall project handover.
+- Both being true simultaneously is possible (Advanced Access may have been granted between `DECISION.md` and the newer brief/Experiment 11). It is equally possible all of the newer successes used the same single development connection/account, which would not automatically extend to production use by external customers — this is in fact confirmed true for Experiment 11 specifically (same connection used throughout this entire project), and merely unknown for 8/9.
+- **This document, and the rest of this repository, does not contain the information needed to determine which.** Confirm current Advanced Access status directly in the Meta App Dashboard before relying on hashtag search as a production discovery mechanism for external organizers. See `docs/HANDOVER.md` §10/§14 for the same distinction applied to the current implementation.
 
 ---
 
-*Compiled retrospectively for handover purposes. If a future test is run and a real response is captured, save it as a redacted fixture (see `fixtures/README.md`) and update the relevant entry above with a concrete evidence source rather than leaving it as [REPORTED — not retained].*
+*Compiled retrospectively for handover purposes (Experiments 1–10) and directly during testing (Experiment 11). If a future test is run and a real response is captured, update the relevant entry with a concrete evidence source rather than leaving it as [REPORTED — not retained].*

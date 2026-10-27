@@ -1,5 +1,7 @@
 # Grafeat — Handover
 
+> **Superseded for Slice B topics (challenges, discovery, processing, sync) as of 2026-10-27 by `docs/HANDOVER.md`.** This file predates the database/schema entirely and is explicitly stale for that area — kept here unmodified otherwise, for its still-accurate pre-Slice-B history. See `docs/HANDOVER.md` for the current state and `docs/DECISIONS.md` for the agreed product/architecture decisions.
+
 This document is the single entry point for anyone (human or agent) picking up Grafeat development. It merges: the architecture review conducted against the actual repository, the historical spike documentation (`SPIKE-RESULTS.md`, `DECISION.md`, `META-SETUP.md`), the running change log (`MERGE-ASSESSMENT.md`), and the decisions made over the course of the production-migration and security-hardening work.
 
 **How to read the labels used throughout:**
