@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Logo } from "../landing/Logo";
 import { Footer } from "../landing/Footer";
 import styles from "./legal.module.css";
 
@@ -14,7 +15,7 @@ export function LegalShell({ eyebrow, title, lastUpdated, intro, children }: Leg
   return (
     <>
       <header className={styles.header}>
-        <div className={styles.logo}>Grafeat</div>
+        <Logo />
         <div className={styles.spacer} />
         <a href="/" className={styles.backLink}>
           ← Back to Grafeat

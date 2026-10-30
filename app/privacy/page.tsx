@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     "How Grafeat collects, uses, and protects information from organizers and public Instagram submissions.",
 };
 
-const LAST_UPDATED = "October 22, 2026";
+const LAST_UPDATED = "October 30, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -33,7 +33,8 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li>
             <strong>Organizers</strong> — people who create an account, connect an Instagram
-            professional account, and use Grafeat to curate and publish a recurring challenge.
+            professional account, and use Grafeat to discover and curate submissions to a
+            recurring challenge.
           </li>
           <li>
             <strong>Participants / creators</strong> — people who post publicly on Instagram and
@@ -77,6 +78,12 @@ export default function PrivacyPolicyPage() {
           <li>Public engagement metadata made available by the API (such as like or comment counts)</li>
         </ul>
         <p>
+          Grafeat stores this metadata, including the media URL Meta&rsquo;s API returns, but does
+          not download or separately store the underlying image or video file. Media URLs returned
+          by Meta&rsquo;s API are often signed and time-limited; Grafeat displays them directly and
+          does not guarantee they remain valid indefinitely.
+        </p>
+        <p>
           This data comes from Instagram&rsquo;s public API surface for content that participants
           have already made public on Instagram — Grafeat does not access private accounts, private
           messages, or content outside what Meta&rsquo;s APIs expose for a given permission level.
@@ -86,11 +93,16 @@ export default function PrivacyPolicyPage() {
       <section>
         <h2>4. How Instagram/Meta APIs are used</h2>
         <p>
-          Grafeat is built to use Instagram&rsquo;s and Meta&rsquo;s official APIs to help an
-          organizer discover eligible submissions to their challenge, retrieve the information
-          needed to evaluate and credit them, and — once an organizer reviews and selects specific
-          posts — prepare and publish a credited carousel back to the organizer&rsquo;s own connected
-          Instagram account.
+          Grafeat currently uses Instagram&rsquo;s and Meta&rsquo;s official APIs to help an
+          organizer discover public submissions to their challenge (for example, by hashtag or
+          mention), retrieve the information needed to verify and evaluate them, and let the
+          organizer review and curate a selection within Grafeat.
+        </p>
+        <p>
+          Composing those selections into a carousel and publishing it back to the
+          organizer&rsquo;s Instagram account is a planned capability that is not yet built into
+          the live product. We do not represent carousel composition or publishing as available
+          today; this policy will be updated before that capability is enabled.
         </p>
         <p>
           Some discovery mechanisms (for example, searching by hashtag) require a level of Meta API
@@ -114,16 +126,26 @@ export default function PrivacyPolicyPage() {
           Facebook&rsquo;s own account settings (Settings → Apps and Websites, or equivalent).
           Revoking access immediately prevents Grafeat from making further API calls on your behalf.
         </p>
+        <p>
+          Grafeat does not currently provide an in-app &ldquo;disconnect&rdquo; control — the
+          account settings pages above are the way to revoke access. Revoking access at Instagram
+          or Facebook stops Grafeat from making further API calls, but does not by itself delete
+          the access token or other data Grafeat has already stored; see Section 9 to request
+          that separately.
+        </p>
       </section>
 
       <section>
         <h2>6. Purposes of processing</h2>
         <p>We process the information described above to:</p>
         <ul>
-          <li>Operate the organizer-facing curation, composition, and publishing workflow</li>
+          <li>Operate the organizer-facing discovery and curation workflow</li>
           <li>Discover and retrieve public submissions relevant to an organizer&rsquo;s challenge</li>
           <li>Evaluate submissions against an organizer&rsquo;s configured rules</li>
-          <li>Prepare and publish credited carousels through an organizer&rsquo;s authorized account</li>
+          <li>
+            Once built, prepare and publish credited carousels through an organizer&rsquo;s
+            authorized account (planned — not yet available; see Section 4)
+          </li>
           <li>Maintain the security, integrity, and reliability of the service</li>
           <li>Respond to support requests and data-deletion requests</li>
         </ul>
@@ -142,20 +164,39 @@ export default function PrivacyPolicyPage() {
             <strong>Vercel</strong> — our hosting and infrastructure provider, which processes
             standard request/connection data as part of serving this application.
           </li>
+          <li>
+            <strong>Neon</strong> — our database provider, which stores organizer account data,
+            connected-account access tokens, and discovered submission data on our behalf.
+          </li>
+          <li>
+            <strong>Resend</strong> — our email provider, used to deliver sign-in links and to
+            notify us internally of new signups. Your email address is shared with Resend solely
+            to send these messages.
+          </li>
+          <li>
+            <strong>Google</strong> — if you choose to sign in with Google (where we have this
+            option enabled), Google acts as an identity provider for that sign-in, under
+            Google&rsquo;s own terms.
+          </li>
         </ul>
         <p>
-          We do not currently integrate any other third-party analytics, advertising, or data
-          processing services. If that changes, we will update this policy.
+          We do not currently integrate any third-party analytics, advertising, or
+          error-monitoring services. If that changes, we will update this policy.
         </p>
       </section>
 
       <section>
         <h2>8. Data retention</h2>
         <p>
-          We retain organizer and submission data only for as long as reasonably necessary to
-          provide the service to the relevant organizer, plus any additional time needed for
-          security, troubleshooting, or legal compliance. When data is no longer needed for these
-          purposes, we delete or de-identify it. See Section 9 for how to request deletion directly.
+          Grafeat does not currently enforce automatic expiry for the data described in this
+          policy. Organizer account information, connected-account access tokens, discovered
+          submissions, and an organizer&rsquo;s curation decisions (selected or rejected
+          submissions) are retained indefinitely by default, for as long as an organizer&rsquo;s
+          account remains active, so that processed results stay available without being
+          reprocessed. Reconnecting an Instagram or Facebook account replaces the previously
+          stored token rather than deleting it separately. We delete data on request — see
+          Section 9 — rather than on a fixed schedule. If we introduce automatic retention limits
+          in the future, we will describe them here.
         </p>
       </section>
 
@@ -178,19 +219,24 @@ export default function PrivacyPolicyPage() {
         <h2>10. Security</h2>
         <p>
           We use reasonable technical and organizational measures designed to protect the
-          information we handle, including restricting access to connected-account tokens and data
-          to what the service needs to operate. No method of transmission or storage is completely
-          secure, and we cannot guarantee absolute security.
+          information we handle, including encrypting connected-account access tokens at rest and
+          restricting access to tokens and submission data to what the service needs to operate.
+          No method of transmission or storage is completely secure, and we cannot guarantee
+          absolute security.
         </p>
       </section>
 
       <section>
         <h2>11. International data processing</h2>
         <p>
-          Grafeat and the third parties described in Section 7 may process and store information in
-          countries other than the one where you live, including the United States. By using
-          Grafeat or by posting content that a Grafeat-connected challenge discovers, you understand
-          that your information may be processed internationally.
+          Grafeat and the third parties described in Section 7 may process and store information
+          in countries other than the one where you live, including the United States, where our
+          hosting and database providers operate. This applies to organizer account data and to
+          data about public Instagram posts a challenge discovers — including posts from
+          participants who have not interacted with Grafeat directly and may not be aware it
+          exists. Participants do not consent to this Privacy Policy by posting publicly on
+          Instagram; this section is a factual disclosure of where processing occurs, not a claim
+          that participants have agreed to these terms.
         </p>
       </section>
 

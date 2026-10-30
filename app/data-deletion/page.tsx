@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "How to request deletion of data Grafeat holds about you or your Instagram account.",
 };
 
-const LAST_UPDATED = "October 22, 2026";
+const LAST_UPDATED = "October 30, 2026";
 
 export default function DataDeletionPage() {
   return (
@@ -54,8 +54,11 @@ export default function DataDeletionPage() {
         <h2>3. What happens next</h2>
         <p>
           We will locate and delete the data associated with the account identified in your
-          request — including stored tokens, cached submission data, and logs or fixtures tied to
-          that account — and confirm back to you by email once this is done.
+          request — including stored access tokens and discovered-submission records in our
+          database — and confirm back to you by email once this is done. We do not maintain
+          separate, persistent log or fixture files tied to individual accounts in production;
+          any operational logs our hosting provider generates follow that provider&rsquo;s own
+          standard retention, not a Grafeat-managed schedule.
         </p>
       </section>
 

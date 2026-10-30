@@ -180,6 +180,26 @@ Every finding below is therefore sourced from **narrative documentation or the c
 
 ---
 
+## 12. Recurrence check: the same hashtag returns zero posts two days later (unresolved)
+
+- **Purpose:** During Slice B manual QA setup (2026-10-29), a fresh sync against a newly-created challenge using the same hashtag as Experiment 11 reported `items_scanned: 0` — investigated directly to determine whether this was a Grafeat-side regression or a genuine upstream change.
+- **Date:** 2026-10-29 (two days after Experiment 11's 2026-10-27 run).
+- **Account/token context:** The same `facebook_login` connection for `@the_calligrail` (`igUserId 17841457665709817`) used throughout this project, read from the live `meta_connection` row and decrypted the same way production code does. Same hashtag, `#grafeattest2026`.
+- **What was checked, directly, read-only, against the live API:**
+  1. **The cached `hashtagId` is still valid.** Re-running `ig_hashtag_search` for `grafeattest2026` resolved to the identical hashtag ID Experiment 11 recorded (`18410775676092331`) — no drift. A direct field lookup on that hashtag node (`GET /{hashtag-id}?fields=id,name`) also resolved cleanly, confirming the hashtag object itself is healthy.
+  2. **The organizer connection is functional**, independent of the hashtag question — a direct call for the organizer's own recent media (`GET /{ig-user-id}/media`) returned real, current posts with normal pagination metadata. This rules out a token/permission regression on the connection as the cause.
+  3. **The exact `recent_media` call Grafeat's discovery engine makes** (`GET /{hashtag-id}/recent_media?user_id=...&fields=id,caption,media_type,permalink,timestamp&limit=50`, identical parameters to Experiment 11) returned **HTTP 200 with `{"data":[]}`** — no `error` object, no `paging` key, no rate-limit response headers. A clean, successful, empty result.
+  4. **Code review of `lib/discovery.ts`/`lib/meta-graph.ts`** (unchanged since the single commit that introduced them, prior to Experiment 11) confirmed there is no client-side filtering between Meta's `data` array and the `itemsScanned`/`newCandidates` counters — `fetchRecentMedia` returns `json.data ?? []` verbatim, and `upsertDiscovered` iterates it 1:1. **Grafeat is not discarding results Meta returned; this specific `recent_media` call returned nothing to discard.**
+- **Observed outcome:** The two posts Experiment 11 discovered and verified on 2026-10-27 are **not returned by the identical `recent_media` call on 2026-10-29**, despite the hashtag ID, hashtag node, and organizer connection all independently checking out as healthy.
+- **Evidence source:** This project's own Slice B QA conversation record, 2026-10-29 — raw request/response captured directly (recent_media's empty-array response and the hashtag-node lookup are quoted above verbatim; the organizer-own-media sanity check's response is described narratively here rather than quoted, since its raw `paging.next` value carried an embedded, now-rotated-pending access token and is deliberately not reproduced in this document).
+- **Confidence:** **[VERIFIED — directly captured and independently re-run]**, same evidence tier as Experiment 11 — this is a live result, not a narrative report.
+- **What this does and does not establish:**
+  - **Established:** the hashtag ID remains valid; the organizer connection remains functional; Meta's `recent_media` edge genuinely returns zero items for this hashtag right now; Grafeat's discovery code applies no filtering that could explain the discrepancy on its own.
+  - **Not established — do not over-read this entry:** *why* the two posts stopped appearing. No raw media ID for either original post was captured in Experiment 11 or persisted anywhere in this project (the `submission` table was empty at the time of this check), so neither post's current existence, visibility, or privacy setting could be checked directly node-by-node. The available evidence is consistent with several different explanations — the posts being deleted, the posts or their authors' accounts becoming private, or Instagram's hashtag-discovery index simply no longer surfacing them for reasons Meta does not document — and **this document does not assert which one occurred.** In particular, do not treat "the index only retains results for a short window" as confirmed behavior from this single data point; it is one plausible hypothesis among several, not a verified characteristic of the API.
+  - **Recommended resolution path:** publish a new test post (or two, matching Experiment 11's genuine-mention / hashtag-only pair) and re-run discovery immediately and again after a delay, to observe directly whether and when fresh posts stop appearing — rather than reasoning further from this single retrospective data point.
+
+---
+
 ## Working API access vs. approved Advanced Access — do not conflate these
 
 Experiments 8, 9, and now **11** are evidence that specific Graph API calls **worked** when tried — 11 being the strongest tier, since it's the first of these to be directly captured and independently re-run in this project's own history rather than reported secondhand. Experiment 7 is evidence that Meta **explicitly rejected** `ig_hashtag_search` pending "Instagram Public Content Access" review, as of the last point this was recorded in `DECISION.md`.
@@ -191,4 +211,4 @@ Experiments 8, 9, and now **11** are evidence that specific Graph API calls **wo
 
 ---
 
-*Compiled retrospectively for handover purposes (Experiments 1–10) and directly during testing (Experiment 11). If a future test is run and a real response is captured, update the relevant entry with a concrete evidence source rather than leaving it as [REPORTED — not retained].*
+*Compiled retrospectively for handover purposes (Experiments 1–10) and directly during testing (Experiments 11–12). If a future test is run and a real response is captured, update the relevant entry with a concrete evidence source rather than leaving it as [REPORTED — not retained].*
