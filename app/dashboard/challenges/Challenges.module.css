@@ -91,12 +91,23 @@
 }
 
 .field {
-  flex: 1 1 200px;
   display: flex;
   flex-direction: column;
   gap: 7px;
   font-size: 13.5px;
   font-weight: 600;
+}
+
+/* Only meaningful inside .fieldRow (a row-direction flex container), where
+   it sets each field's minimum width so Start/End date sit side by side.
+   Scoped here rather than on the base .field rule above — .field is also
+   used directly as a column-flex child of .form (Name, Timezone, Status),
+   where the same "flex: 1 1 200px" would set a 200px *height* instead
+   (flex-basis follows the main axis, which is vertical in a column flex
+   container) — that was silently reserving ~200px of empty space under
+   every top-level field. */
+.fieldRow > .field {
+  flex: 1 1 200px;
 }
 
 .input,
