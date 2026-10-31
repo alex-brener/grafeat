@@ -21,7 +21,17 @@
  *   HTML attributes.
  * - `font-src 'self'` is sufficient — all fonts are self-hosted under
  *   app/fonts/ (next/font/local), no external font host is used.
- * - No external script/image/connect hosts are used anywhere in the app,
+ * - `img-src` additionally allows `https://*.cdninstagram.com` — the
+ *   Instagram CDN host Meta's API returns in `submission.mediaUrl`/
+ *   `thumbnailUrl` (SubmissionGallery.tsx renders these directly, confirmed
+ *   live: both verified QA submissions resolved to `scontent.cdninstagram.com`
+ *   — see docs/meta-api-experiments.md Experiment 11). Scoped to that one
+ *   wildcard subdomain, not a bare exact host: Meta shards this CDN across
+ *   many `scontent-<edge>.cdninstagram.com`-style hosts depending on region/
+ *   load, so allowing only the literal host seen in local testing would
+ *   silently re-break images for a differently-routed request. No other
+ *   external image host is used anywhere in the app.
+ * - No other external script/connect hosts are used anywhere in the app,
  *   so everything else can stay 'self'-only.
  *
  * Referrer-Policy is split by path rather than set once for `/:path*`:
@@ -40,7 +50,7 @@ const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  "img-src 'self' data: https://*.cdninstagram.com",
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",

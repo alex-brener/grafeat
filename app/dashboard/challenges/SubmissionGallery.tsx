@@ -40,7 +40,13 @@ export function SubmissionGallery({ challengeId, initialItems, initialNextCursor
   // requests for the same submission.
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
-  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+  // Per-item image fallback stage. Starts on mediaUrl (or thumbnailUrl if
+  // that's all there is); on a load error, falls back to thumbnailUrl if
+  // one exists and differs, then to the "Image unavailable" placeholder.
+  // Mirrors the documented real-world failure mode (meta-api-experiments.md
+  // Experiment 11): Meta's media_url/thumbnail_url are signed, time-limited
+  // CDN links that can expire independently of each other.
+  const [imageFailStage, setImageFailStage] = useState<Record<string, "thumbnail" | "failed">>({});
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -96,12 +102,26 @@ export function SubmissionGallery({ challengeId, initialItems, initialNextCursor
     return <p className={styles.hint}>No gallery-ready submissions yet — processed, genuinely-mentioned, date-eligible posts will appear here after a sync.</p>;
   }
 
+  function handleImageError(item: GalleryItem) {
+    setImageFailStage((prev) => {
+      const stage = prev[item.id];
+      // Already on (or started on) the thumbnail and that failed too — nothing left to try.
+      if (stage === "thumbnail") return { ...prev, [item.id]: "failed" };
+      // First failure: if a distinct thumbnailUrl exists, try it next.
+      if (item.thumbnailUrl && item.thumbnailUrl !== item.mediaUrl) {
+        return { ...prev, [item.id]: "thumbnail" };
+      }
+      return { ...prev, [item.id]: "failed" };
+    });
+  }
+
   return (
     <div>
       <div className={styles.galleryGrid}>
         {items.map((item) => {
           const pending = pendingIds.has(item.id);
-          const imageSrc = !brokenImages.has(item.id) ? item.mediaUrl ?? item.thumbnailUrl : null;
+          const stage = imageFailStage[item.id];
+          const imageSrc = stage === "failed" ? null : stage === "thumbnail" ? item.thumbnailUrl : (item.mediaUrl ?? item.thumbnailUrl);
           return (
             <div key={item.id} className={styles.galleryCard}>
               <div className={styles.galleryImageWrap}>
@@ -109,10 +129,10 @@ export function SubmissionGallery({ challengeId, initialItems, initialNextCursor
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={imageSrc}
-                    alt={item.caption ?? "Submission artwork"}
+                    alt={item.creatorUsername ? `Submission by @${item.creatorUsername}` : "Challenge submission artwork"}
                     loading="lazy"
                     className={styles.galleryImage}
-                    onError={() => setBrokenImages((prev) => new Set(prev).add(item.id))}
+                    onError={() => handleImageError(item)}
                   />
                 ) : (
                   <div className={styles.galleryImageFallback}>
