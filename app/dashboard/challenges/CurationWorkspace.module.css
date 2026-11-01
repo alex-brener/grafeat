@@ -1,0 +1,567 @@
+/* Demo-fidelity palette reused as-is from app/globals.css's design tokens
+   (the landing-page demo and this dashboard already share the same
+   --color-olive/--color-ink/--color-border values — no separate theme
+   needed to match it). */
+
+.daySwitcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.dayButton {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dayButton:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.dayButton_active {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-paper);
+  font-weight: 600;
+}
+
+.dayButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dayButtonFuture {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 20px;
+}
+
+.tab {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px 11px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--color-border);
+}
+
+.tab_active {
+  border-bottom-color: var(--color-ink);
+  background: var(--color-card-paper);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.tabCount {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.notYetSampled {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin: 0 0 18px;
+}
+
+/* --- Shared image-card grid (Ready tab, Set-aside tab, tray) --- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 22px 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cardArt {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-border);
+  border: none;
+  padding: 0;
+  display: block;
+  width: 100%;
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: var(--color-border);
+}
+
+.cardImageFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.selectBadge {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.selectBadge_selected {
+  background: var(--color-olive);
+  color: #fff;
+}
+
+.selectBadge_unselected {
+  background: rgba(22, 21, 18, 0.22);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+}
+
+.viewButton {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(251, 250, 246, 0.9);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.cardCreator {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardDate {
+  color: var(--color-text-muted);
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
+}
+
+.rejectButton,
+.undoButton,
+.removeButton {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.rejectButton:hover:not(:disabled) {
+  background: rgba(233, 183, 158, 0.3);
+}
+
+.undoButton:hover:not(:disabled),
+.removeButton:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.rejectButton:disabled,
+.undoButton:disabled,
+.removeButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cardError {
+  font-size: 11.5px;
+  color: var(--color-ink);
+}
+
+/* --- Set-aside categories --- */
+
+.asideIntro {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  max-width: 680px;
+}
+
+.category {
+  margin-bottom: 28px;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.categoryTitle {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 22px;
+}
+
+.categoryCount {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.categoryToggle {
+  background: none;
+  border: none;
+  color: var(--color-olive);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.reasonTag {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* --- Tray --- */
+
+.trayEmpty {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.trayGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+}
+
+.trayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.trayArt {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-border);
+  border: none;
+  padding: 0;
+  width: 100%;
+}
+
+.trayBadge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--color-olive);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Lightbox --- */
+
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(22, 21, 18, 0.94);
+  display: flex;
+  flex-wrap: wrap;
+  overflow: auto;
+}
+
+.lightboxImageArea {
+  flex: 1 1 420px;
+  min-height: 420px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 64px;
+}
+
+.lightboxImage {
+  position: relative;
+  width: min(100%, 520px);
+  aspect-ratio: 4 / 5;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+  background: #11100e;
+}
+
+.lightboxImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lightboxCloseButton,
+.lightboxNavButton {
+  position: absolute;
+  border: 1px solid rgba(244, 241, 234, 0.25);
+  background: transparent;
+  color: var(--color-paper);
+  cursor: pointer;
+}
+
+.lightboxCloseButton {
+  left: 18px;
+  top: 14px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.lightboxNavButton {
+  top: 50%;
+  margin-top: -20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.lightboxNavButton_prev {
+  left: 14px;
+}
+
+.lightboxNavButton_next {
+  right: 14px;
+}
+
+.lightboxNavButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.lightboxAside {
+  flex: 0 1 380px;
+  min-width: 300px;
+  background: var(--color-paper);
+  padding: 26px 26px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+}
+
+.lightboxHandle {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  line-height: 1.05;
+  word-break: break-word;
+  margin: 0;
+}
+
+.lightboxMeta {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.lightboxCaption {
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--color-ink);
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+}
+
+.checkRow {
+  display: flex;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.checkIcon {
+  width: 14px;
+  flex: none;
+  font-weight: 700;
+}
+
+.checkIcon_ok {
+  color: var(--color-olive);
+}
+
+.checkIcon_fail {
+  color: #a4502b;
+}
+
+.checkIcon_pending {
+  color: #8a6510;
+}
+
+.lightboxActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.lightboxPrimaryButton {
+  flex: 1;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lightboxSelectedButton {
+  flex: 1;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-olive);
+  background: rgba(92, 97, 39, 0.18);
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lightboxSecondaryButton {
+  flex: 1;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .lightboxImageArea {
+    padding: 32px 20px;
+    min-height: 320px;
+  }
+}
+
+/* --- Toast --- */
+
+@keyframes workspaceToastUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 300;
+  transform: translateX(-50%);
+  max-width: calc(100% - 40px);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 13px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: workspaceToastUp 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

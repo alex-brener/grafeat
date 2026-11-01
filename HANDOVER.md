@@ -2,6 +2,167 @@
 
 > **Superseded for Slice B topics (challenges, discovery, processing, sync) as of 2026-10-27 by `docs/HANDOVER.md`.** This file predates the database/schema entirely and is explicitly stale for that area — kept here unmodified otherwise, for its still-accurate pre-Slice-B history. See `docs/HANDOVER.md` for the current state and `docs/DECISIONS.md` for the agreed product/architecture decisions.
 
+---
+
+## Current work in progress — UX-A (2026-10-31)
+
+**Objective:** align the real organizer dashboard with the landing-page demo (`app/landing/curator/*`) and add daily-isolated curation with stable, capacity-bounded sampling. Full specification: **`docs/UX-A-IMPLEMENTATION.md`** (durable spec) — this section is the live operational status only; the spec doesn't change as work proceeds, this does.
+
+**Baseline before this work started:** branch `main`, HEAD `6f9b7cc` ("Interface fixes"), working tree clean except untracked planning-prompt files, up to date with `origin/main` (confirmed via `git fetch`). `tsc --noEmit` clean, 173/173 tests passing.
+
+**Authorization boundary for this work:** local implementation only. **Not** authorized: applying the migration to production/shared DB, committing, pushing (`main` auto-deploys Vercel), deploying, running a live Meta sync, changing Meta connections/env vars. See `docs/UX-A-IMPLEMENTATION.md` §7 for the phase plan.
+
+**Phase status — all 5 implementation phases code-complete, verified by `tsc`/tests/build; interactive browser QA still pending (see below):**
+- [x] Phase 1 — Schema + challenge validation
+- [x] Phase 2 — Review-pool admission
+- [x] Phase 3 — Day-scoped read APIs
+- [x] Phase 4 — Curation workspace UI
+- [x] Phase 5 — Demo-fidelity polish
+- [x] Phase 6 — `tsc`, tests, production build (manual browser QA not done — no browser in this environment)
+
+**Phase 1 — done (2026-10-31):**
+- `lib/db/schema/challenge.ts`: added `dailyReviewLimit` (`integer`, `NOT NULL DEFAULT 200`, check constraint `BETWEEN 50 AND 500`).
+- `lib/db/schema/submission.ts`: added `sampledForReview` (`boolean`, `NOT NULL DEFAULT false`, monotonic false→true only).
+- `lib/challenge.ts`'s `updateChallenge`: added a timezone-lock guard (rejects a `timezone` change once the challenge has any submission row) and optional `dailyReviewLimit` validation (50–500; omitting it from the input leaves the existing value untouched, since the Settings UI doesn't expose a control for it yet — that's Phase 4/5).
+- `app/api/challenges/[id]/route.ts`: `toInput` now passes through an optional `dailyReviewLimit` from the request body.
+- Tests: 3 new cases added to `tests/challenge.test.ts` (dailyReviewLimit range rejection, timezone change allowed pre-submission, timezone change rejected post-submission).
+- `tsc --noEmit` clean. Full suite: **176/176 passing** (up from the 173/173 baseline).
+
+**Migration state:** generated locally only — `drizzle/0006_ux_a_review_sampling.sql`. **Not applied to any database**, including the local dev DB the running test suite doesn't touch (tests run against an in-memory PGlite instance that replays every migration file fresh each run). Applying this to the real dev/prod database is a separate action requiring explicit approval — see the migration SQL itself before approving:
+```sql
+ALTER TABLE "challenge" ADD COLUMN "daily_review_limit" integer DEFAULT 200 NOT NULL;
+ALTER TABLE "submission" ADD COLUMN "sampled_for_review" boolean DEFAULT false NOT NULL;
+ALTER TABLE "challenge" ADD CONSTRAINT "challenge_daily_review_limit_range" CHECK ("challenge"."daily_review_limit" BETWEEN 50 AND 500);
+```
+Both columns are additive with safe defaults — existing rows backfill automatically, no application code path depends on this migration having run yet (nothing reads `dailyReviewLimit`/`sampledForReview` outside tests until Phase 2).
+
+**Phase 2 — done (2026-10-31):**
+- New `lib/review-pool.ts`: `admitToReviewPool(db, challenge)` — for every grace-elapsed challenge-local day, admits up to `dailyReviewLimit - alreadySampled` eligible/verified/completed submissions, ordered by `allocationRank` ascending, via a single conditional `UPDATE ... WHERE sampled_for_review = false` per row (atomic by virtue of being one statement — no explicit transaction needed, unlike `completeSubmission`'s two-table charge).
+- `lib/sync.ts`: calls `admitToReviewPool` right after `runProcessing`, inside the same try block (so it only runs on a sync that got past discovery/processing without throwing), before computing `status`/finalizing `sync_run`. Runs unconditionally even on a `partial` processing outcome.
+- Tests: new `tests/review-pool.test.ts` (8 cases) covering grace-period gating, the completed+verified+dateEligible+not-yet-sampled filter, allocationRank-ordered cutoff at the limit, idempotent re-runs, later top-up without disturbing earlier admissions, decrease-never-evicts, and per-day isolation.
+- `tsc --noEmit` clean. Full suite: **184/184 passing** (up from 176/176 after Phase 1).
+- No new migration needed for this phase (uses the columns Phase 1 already added).
+
+**Phase 3 — done (2026-10-31):**
+- `lib/submission-gallery.ts`: `getGallerySubmissions`/`getDiagnosticSummary`/`getDiagnosticSubmissions` now require an explicit `day` (challenge-local, `YYYY-MM-DD`) and are fully day-isolated. `getGallerySubmissions` ("Ready" tab) now also excludes `reviewStatus='rejected'` — closing a real pre-existing gap — and requires `sampledForReview=true`. `DIAGNOSTIC_CATEGORIES` ("Set aside" tab) grew a 5th category, `"rejected"`, for manually-rejected eligible items (distinguishable from the 4 automatic exclusions, per locked decision #5).
+- New functions: `getSelectedSubmissions` (tray — every selected item for the day, deliberately unpaginated, no truncation), `getDayStats` (discovered/completed/eligible/sampled/selected), `getNotYetSampledCount` (count only, never a browsable list — locked decision #4), `listChallengeDays` (powers the future day switcher, each day flagged `graceElapsed`), `resolveDay`/`pickDefaultDay` (shared "which day" logic: an explicit day is used as-is; omitted, resolves to the latest grace-elapsed day; `no_day_available` when none has cleared grace yet).
+- `SubmissionCardData` gained `mentionResult`/`dateEligible` (closes another real gap — needed for Phase 4's lightbox checklist).
+- Routes: `submissions`, `submissions/diagnostics`, `submissions/diagnostics/[category]` all take an optional `?day=` now (defaulting server-side via `resolveDay`). New routes: `submissions/selected` (tray), `submissions/stats` (day stats + not-yet-sampled count bundled together, to avoid a near-duplicate 5th route).
+- `app/dashboard/challenges/[id]/page.tsx` updated to resolve a day before calling the now-day-scoped functions — still shows only the single default day (no switcher yet, that's Phase 4), but is correctly day-scoped rather than all-time.
+- **Known, deliberate interim gap (not a regression):** `SubmissionGallery.tsx`/`DiagnosticsPanel.tsx` (the actual UI components) are untouched — no day switcher, and `DiagnosticsPanel.tsx`'s local category type/display still only covers 4 of the 5 categories (doesn't render "rejected" yet). Both are explicitly Phase 4 scope.
+- Tests: `tests/submission-gallery.test.ts` substantially rewritten (day param threaded through every existing case, `sampledForReview`/`rejected` fixtures added, new describe blocks for all 4 new functions plus `resolveDay`/`pickDefaultDay` — 23 cases net new/changed).
+- `tsc --noEmit` clean. Full suite: **199/199 passing** (up from 184/184 after Phase 2).
+- Production build (`next build`) deliberately **not** run this phase — a Grafeat `next dev` server is live on port 3002 right now (shares `.next` with a build and would have its chunk cache corrupted); deferred to Phase 6 alongside the others, when it can be run cleanly.
+
+**Phase 4 — done, code-complete (2026-10-31); interactive QA still pending:**
+- New files: `app/dashboard/challenges/CurationWorkspace.tsx`, `app/dashboard/challenges/CurationWorkspace.module.css`. Deleted: `app/dashboard/challenges/SubmissionGallery.tsx`, `app/dashboard/challenges/DiagnosticsPanel.tsx` (nothing else imported them — confirmed before deleting).
+- `app/dashboard/challenges/[id]/page.tsx`: now resolves `listChallengeDays`/`pickDefaultDay` and fetches all 6 day-scoped pieces (stats, gallery, diagnostics summary, selected, day stats, not-yet-sampled) in parallel, passing them as `initial*` props into `CurationWorkspace`. Same remount-on-sync `key=` pattern as before, just renamed to match.
+- One client component (`CurationWorkspace`) owns day/tab/list/mutation state — the single shared optimistic-mutation path required by locked decision #6. Day switcher re-fetches 4 endpoints in parallel on switch. Ready tab: tap-to-select badge (toggles selected/unreviewed) + a separate, visually secondary Reject button + a View button that opens the shared lightbox without touching selection. Set-aside tab: 5 categories (the original 4 automatic exclusions, read-only, plus "rejected" with Undo). Tray: unpaginated, every selected item for the day. Lightbox: real `mentionResult`/`dateEligible` checklist, Escape/arrow-key navigation, actions only shown when opened from Ready/rejected/tray.
+- **Two real bugs caught and fixed during self-review, before calling this done:** (1) the View and select-badge buttons were nested inside the card's own `<button>` — invalid HTML, silently non-functional; restructured the tap target to a `div[role=button]` with real sibling buttons. (2) the lightbox's "which list/which actions" logic collapsed every non-Ready/tray source to the "rejected" category, which would have shown the **wrong item** when opened from any of the other 4 diagnostic categories, and would have exposed Select/Reject on a submission that was never actually verified or eligible (`setSubmissionReviewStatus` has no eligibility check of its own — the UI is the only thing stopping that). Fixed by keying the lightbox's source to the specific category and gating actions on an explicit `actionable` flag.
+- Verification done: `tsc --noEmit` clean; full suite 199/199 passing (no `lib/` changes this phase); confirmed the page compiles cleanly under the live dev server on port 3002 (unauthenticated request correctly 307s to `/login` rather than 500ing — rules out a module/syntax error, not a substitute for real QA).
+- **Explicitly not done, deferred to Phase 5:** challenge switcher, Curate→Compose→Publish stepper, Settings relocation, toasts, richer challenge-list cards.
+- **Known limitation — flagging per the "don't present untested work as validated" instruction:** no interactive browser pass has happened. tap-to-select, the Reject/Undo flow, day switching, optimistic-rollback-on-failure, and the lightbox's keyboard navigation have not been exercised by a human or a browser tool. This is real, functioning code wired to the real day-scoped APIs (not placeholder), but it has not been clicked through.
+
+**Phase 5 — done (2026-10-31):**
+- New `app/dashboard/challenges/CurateStepper.tsx` (Curate active; Compose/Publish rendered as plain, non-interactive text — genuinely disabled, never a styled-disabled button or a dead link, per the explicit instruction not to present placeholder actions as finished) and `ChallengeSwitcher.tsx` (a native `<select>`, chosen specifically because it gets keyboard/focus support for free at pilot scale rather than needing a custom dropdown).
+- Settings relocated off the main curation page to its own route, `app/dashboard/challenges/[id]/settings/page.tsx`, reached via a top-right "Settings" link (closing the §3 fidelity gap). `ChallengeForm.tsx` gained: the `dailyReviewLimit` field (50–500, closing the interim gap flagged at the end of Phase 1 — "Settings UI doesn't expose it yet"), and a client-side timezone lock (the `<select>` disables itself with an explanation once the challenge has any submission, mirroring `updateChallenge`'s own server-side guard instead of only discovering it via a failed save).
+- New `lib/challenge.ts` export: `challengeHasSubmissions(db, challengeId)` — factored out of `updateChallenge`'s inline check so the Settings page can show the same rule it enforces. New test added to `tests/challenge.test.ts`.
+- `CurationWorkspace` gained a bottom-centered, auto-dismissing toast on every successful select/reject/undo (distinct from the existing inline per-card error text, which stays for failures).
+- `app/dashboard/challenges/page.tsx` (the challenges list) now shows discovered/eligible counts and last-sync status per card (one extra `getChallengeSyncStats` call per challenge — fine at this pilot's scale, same judgment already used elsewhere in this codebase).
+- `tsc --noEmit` clean. Full suite: **200/200 passing** (up from 199/199 after Phase 3 — Phase 4 added no lib tests).
+
+**Phase 6 — done (2026-10-31):**
+- `tsc --noEmit`: clean.
+- Full test suite: **200/200 passing**.
+- Production build: ran `next build` cleanly (stopped the live `next dev` server on port 3002 first, with your explicit go-ahead, to avoid the known `.next`-cache-corruption hazard; restarted it fresh immediately after — confirmed back up and all touched routes, including the two brand-new ones, responding correctly). Build output confirms every new/changed route compiled: `/api/challenges/[id]/days`, `/api/challenges/[id]/submissions/selected`, `/api/challenges/[id]/submissions/stats`, `/dashboard/challenges/[id]/settings`, plus all previously-existing routes.
+- **Manual interactive QA: NOT done.** This environment has no browser. Nothing in the §8 QA checklist (day isolation, grace-period gating by eye, pool stability across a real sync, limit changes, rejection/Undo, tray correctness, lightbox behavior, workspace isolation across routes, post-migration-sync visibility) has been clicked through by a human or a browser tool. Everything described as "done" above means: code written, wired to real (non-placeholder) endpoints, type-checked, unit/integration-tested against a real Postgres dialect (PGlite), and confirmed to compile — not that it has been used.
+
+---
+
+## Final deliverable (2026-10-31)
+
+**Everything requested is now code-complete, locally. Nothing has been committed, pushed, deployed, applied to any shared database, or synced live — all exactly as scoped.**
+
+**Changed files** (`git status --short`, 29 entries):
+- *Schema:* `lib/db/schema/challenge.ts`, `lib/db/schema/submission.ts`
+- *New migration (generated, not applied):* `drizzle/0006_ux_a_review_sampling.sql`, `drizzle/meta/0006_snapshot.json`, `drizzle/meta/_journal.json`
+- *New lib module:* `lib/review-pool.ts`
+- *Changed lib:* `lib/challenge.ts`, `lib/submission-gallery.ts`, `lib/sync.ts`
+- *New API routes:* `app/api/challenges/[id]/days/route.ts`, `app/api/challenges/[id]/submissions/selected/route.ts`, `app/api/challenges/[id]/submissions/stats/route.ts`
+- *Changed API routes:* `app/api/challenges/[id]/route.ts`, `app/api/challenges/[id]/submissions/route.ts`, `app/api/challenges/[id]/submissions/diagnostics/route.ts`, `app/api/challenges/[id]/submissions/diagnostics/[category]/route.ts`
+- *New UI:* `app/dashboard/challenges/CurationWorkspace.tsx` + `.module.css`, `CurateStepper.tsx`, `ChallengeSwitcher.tsx`, `app/dashboard/challenges/[id]/settings/page.tsx`
+- *Changed UI:* `app/dashboard/challenges/[id]/page.tsx`, `app/dashboard/challenges/page.tsx`, `app/dashboard/challenges/ChallengeForm.tsx`, `app/dashboard/challenges/Challenges.module.css`
+- *Deleted:* `app/dashboard/challenges/SubmissionGallery.tsx`, `app/dashboard/challenges/DiagnosticsPanel.tsx`
+- *Tests:* `tests/challenge.test.ts` (changed), `tests/submission-gallery.test.ts` (substantially rewritten), `tests/review-pool.test.ts` (new)
+- *Docs:* this file, `docs/UX-A-IMPLEMENTATION.md` (new)
+
+**Migration — the one piece requiring separate approval before this is usable beyond local dev:**
+```sql
+ALTER TABLE "challenge" ADD COLUMN "daily_review_limit" integer DEFAULT 200 NOT NULL;
+ALTER TABLE "submission" ADD COLUMN "sampled_for_review" boolean DEFAULT false NOT NULL;
+ALTER TABLE "challenge" ADD CONSTRAINT "challenge_daily_review_limit_range" CHECK ("challenge"."daily_review_limit" BETWEEN 50 AND 500);
+```
+**Safety assessment:** both columns are additive with `NOT NULL DEFAULT`, so every existing row backfills automatically with no table lock beyond the brief metadata change Postgres needs for a constant-default `ADD COLUMN` (fast on modern Postgres/Neon — no full-table rewrite). No column is dropped, renamed, or retyped. No other table is touched. Nothing in the running application reads either new column until this migration has actually run.
+
+**Test/build results:** `tsc --noEmit` clean throughout. Full suite **200/200 passing** (started at 173/173; +27 net new/changed tests across `challenge.test.ts`, `review-pool.test.ts`, `submission-gallery.test.ts`). `next build` succeeds cleanly.
+
+---
+
+## Development database — configured, verified, migration applied (2026-11-01)
+
+**Status: migration 0006 is now applied to the verified Neon development branch. Production is untouched.**
+
+**What happened, in order:**
+1. The owner created a Neon branch from production ("Branch data and schema — current snapshot", auto-delete disabled) and pointed `.env.local`'s `DATABASE_URL` at it.
+2. The app's first real page load against it failed with the exact "column does not exist" error predicted by the undeployed migration — expected, not a new bug (the dev branch is a snapshot of production's *pre-UX-A* schema).
+3. Branch identity was verified **conclusively**, not just by hostname: a read-only `SELECT` against `pg_settings` on the connection `DATABASE_URL` resolves to returned Neon's own control-plane identifiers — `neon.branch_id`, `neon.project_id`, `neon.endpoint_id`, `neon.tenant_id` — directly from the running Postgres instance. The owner cross-confirmed the branch id against Neon Console before anything was written. (A read-only identity check against the separately-labeled `DATABASE_URL_PROD` variable was attempted for extra corroboration and was itself blocked by this environment's own safety classifier — "Production Reads" — which was respected, not worked around. Not needed in the end; the dev-side verification alone was conclusive and owner-confirmed.)
+4. A real gap was found and worked around rather than papered over: `drizzle.config.ts` loads env via plain `dotenv/config`, which only reads a `.env` file (none exists in this repo) — it does **not** pick up `.env.local` the way Next.js does. Running `npm run db:migrate` as configured would have silently targeted a placeholder `localhost:5432` connection (which would just fail to connect, not silently hit the wrong real database — nothing is listening on local 5432 — but it also wouldn't do anything useful). Fixed for this one invocation only, with no change to any committed file, using Node's built-in `--env-file` flag: `node --env-file=.env.local ./node_modules/.bin/drizzle-kit migrate`.
+5. Pre-migration read-only inspection confirmed: `drizzle.__drizzle_migrations` had exactly 6 recorded entries matching local files `0000`–`0005`; migration `0006` was not recorded; the two new columns and the new check constraint did not exist; cloned data present (**1 challenge, 4 submissions**); no other pending migrations existed beyond `0006`.
+6. Migration `0006_ux_a_review_sampling.sql` applied via the command above. **Only** that one migration ran — drizzle's own hash-based tracking skipped `0000`–`0005` automatically, exactly as intended ("constrained to that one pending migration" rather than a blind run of everything pending).
+7. Post-migration verification (all read-only): `drizzle.__drizzle_migrations` now has 7 entries (the new one timestamped at apply time); `challenge.daily_review_limit` and `submission.sampled_for_review` both exist; `challenge_daily_review_limit_range` constraint exists; row counts **unchanged** (1 challenge, 4 submissions); the challenge's `name`/`status` and each submission's `processing_status`/`review_status` are byte-for-byte what they were before (one submission's pre-existing `review_status = 'selected'` — a real prior curator decision — is still exactly `selected`); the challenge's new `daily_review_limit` defaulted to `200`; all 4 submissions' new `sampled_for_review` defaulted to `false`, as the column's own default dictates.
+8. Dev server restarted fresh on port 3002 (`.next` cleared first). Confirmed healthy: `/` returns 200; `/dashboard/challenges` and `/dashboard/challenges/[id]` both now correctly 307-redirect to `/login` (the expected unauthenticated response) instead of 500ing — the exact query that crashed before (`listChallenges`'s full column list, replayed directly and confirmed to succeed) now works.
+
+**A real, expected consequence of migrating a production *snapshot* rather than running a live sync — reported, not fixed:**
+- All 4 cloned submissions have `sampled_for_review = false`. This is correct, not a bug: the review-pool admission pass (`lib/review-pool.ts`) only ever runs inside `runSync`, and no sync has run against this dev branch (none is authorized to — that would be a live Meta sync, explicitly out of scope here).
+- Concretely (before the admission run below resolved this): the Ready tab and the tray both showed **0 items**, even though one submission already had `review_status = 'selected'` from before — it didn't surface in the tray either, since the tray's own query also requires `sampled_for_review = true` (intentional: tray membership follows admission, not just a historical decision). The one real challenge-local day is `2026-10-30` (timezone `Asia/Jerusalem`; an earlier read-only check using a raw, non-Drizzle date read misreported this as `2026-10-29` due to a JS `Date`-object timezone-conversion artifact in that ad hoc script, not a real discrepancy — the authoritative value, read the same way the real code reads it, is `2026-10-30`), grace period long elapsed.
+- **Resolved (2026-11-01):** the owner separately authorized a one-time `admitToReviewPool` call against this dev challenge only. Executed via `tsx` (project's own TypeScript runner) calling the real `lib/review-pool.ts` function directly — not a reimplementation, not `runSync`, no Meta/Instagram call. Precondition checked explicitly first: the one challenge-local day (`2026-10-30`, timezone `Asia/Jerusalem`) had already cleared its 3-hour grace period, confirmed via the same `isGraceElapsed` the real admission pass uses.
+  - **Before:** 4 submissions, `sampled_for_review = false` for all 4.
+  - **After:** 4 submissions, `sampled_for_review = true` for exactly **2** (`admitToReviewPool` returned `admitted: 2`).
+  - **Verified:** the 2 newly-admitted rows are exactly the 2 that are `processingStatus='completed' AND mentionResult='verified' AND dateEligible=true`; the other 2 (`mentionResult='not_verified'`) were correctly left unsampled. Every row's `reviewStatus` is byte-for-byte unchanged (the pre-existing `selected` decision is still `selected`). Admitted count (2) is well within `dailyReviewLimit` (200). No production writes, no commit/push/deploy, no Meta/Instagram call.
+  - **Consequence for browser QA:** the Ready tab should now show 2 items (one already marked `selected` with its badge, one `unreviewed`), and the tray should now show the 1 already-selected item. The 2 `not_verified` submissions remain correctly in Set-aside, untouched.
+
+**Browser QA — what to click first:**
+1. Sign in, go to the one cloned challenge ("grafeattest2026", draft status).
+2. Day switcher should show exactly one day: `2026-10-30`, already past grace.
+3. Ready tab should now show **2 items** — one already badged as selected (a real prior decision, preserved), one unreviewed. Tap-to-select, Reject, and the lightbox are all exercisable here.
+4. Tray should show the 1 already-selected item.
+5. Set-aside tab should show the other 2 submissions (both `not_verified`), read-only, no "rejected" category yet (nothing's been manually rejected in this dev data).
+6. Settings page, the stepper, and the challenge switcher (a no-op dropdown with only one challenge) are all safe to click through regardless.
+
+**Final confirmation:**
+- Production database: **not connected to, not modified.** (One read-only identity probe against it was attempted and blocked by the environment's own classifier before it could run — a hard stop, not a near-miss.)
+- Production Vercel environment variables: **untouched** — never accessed from this session.
+- Meta/Instagram: **no API call made.**
+- Git: **no commit, no push.** `git log -1` still shows `6f9b7cc`.
+- Deployment: **none.**
+- `.env.local`: confirmed gitignored (`.env*.local` pattern) and not tracked (`git ls-files` shows only `.env.example`, a secret-free template).
+
+**Remaining risks / what's genuinely unverified:**
+1. **No interactive browser QA** — this is the big one. The curation workspace (tap-to-select, Reject/Undo, day switching, the lightbox, optimistic rollback on a simulated failure) has never been clicked through. Please run the §8 QA checklist in `docs/UX-A-IMPLEMENTATION.md` by hand before trusting this with real organizer use.
+2. **Fresh pilot data only** — nothing has exercised this against the actual, currently-connected Meta account's real historical submissions; the existing QA submissions from Slice B predate `sampled_for_review` and will need an authorized sync (not the migration itself) before they show up anywhere.
+3. **Visual fidelity is a judgment call, not a pixel match** — I ported the demo's color palette, card treatment, and interaction model deliberately rather than its literal inline-style code, and adapted the fixed-viewport demo shell into this dashboard's normal scrolling page flow. Worth a side-by-side look against `app/landing/curator/*` before considering Phase 5 fully "done" in spirit, not just in code.
+4. **Two bugs were caught by self-review, which means more could exist that weren't.** See Phase 4's note above for what was found and fixed (nested buttons; a lightbox item/action leak across diagnostic categories).
+
+**Precise next steps, in order:**
+1. You (or a browser-capable session) run the §8 QA checklist by hand.
+2. Separately decide and tell me the exact migration target, then approve applying it there.
+3. Only after that: an authorized sync against a real connected challenge, to confirm existing QA submissions surface correctly.
+4. Only after you're satisfied: commit, and separately, push to `main` (which auto-deploys Vercel) — both still require your explicit go-ahead, not implied by anything above.
+
+*(This section is updated at each phase boundary. If you're resuming this work in a new session: read this section, `docs/UX-A-IMPLEMENTATION.md`, run `git status`/`git log -1`, and confirm actual migration state against what's recorded here before continuing — don't assume prior authorization for anything beyond what §"Authorization boundary" above states.)*
+
+---
+
 This document is the single entry point for anyone (human or agent) picking up Grafeat development. It merges: the architecture review conducted against the actual repository, the historical spike documentation (`SPIKE-RESULTS.md`, `DECISION.md`, `META-SETUP.md`), the running change log (`MERGE-ASSESSMENT.md`), and the decisions made over the course of the production-migration and security-hardening work.
 
 **How to read the labels used throughout:**

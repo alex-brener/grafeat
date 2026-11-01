@@ -6,6 +6,7 @@ import { createMetaGraphClient, MetaGraphError, type MetaGraphClient } from "@/l
 import { acquireSyncLease, releaseSyncLease } from "@/lib/sync-lease";
 import { runDiscovery } from "@/lib/discovery";
 import { runProcessing } from "@/lib/processing";
+import { admitToReviewPool } from "@/lib/review-pool";
 
 // Leaves margin inside Vercel Hobby's ~300s function-execution ceiling for
 // the lease update, sync_run finalization, and request/response overhead.
@@ -100,6 +101,18 @@ export async function runSync(
       },
       deadline
     );
+
+    // Admission is pure DB bookkeeping (no Meta call), so it can't produce
+    // a rate-limit/token/permissions outcome — runs unconditionally after
+    // processing, regardless of whether processing itself was complete or
+    // partial, so an already-verified day keeps filling even on a sync
+    // that had to stop early elsewhere.
+    await admitToReviewPool(db, {
+      id: challenge.id,
+      timezone: challenge.timezone,
+      processingGracePeriodHours: challenge.processingGracePeriodHours,
+      dailyReviewLimit: challenge.dailyReviewLimit,
+    });
 
     const status: "completed" | "partial" | "error" =
       discoveryResult.status === "error" || processingResult.status === "error"

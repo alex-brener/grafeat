@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import type { AppDb } from "@/lib/db/client";
-import { challenge } from "@/lib/db/schema";
+import { challenge, submission } from "@/lib/db/schema";
 import { isValidTimeZone } from "@/lib/timezone";
 
 /** "#CreativeOctober2026" / " creativeoctober2026 " / "creativeoctober2026" all normalize to the same value. */
@@ -88,21 +88,41 @@ export async function getChallenge(db: AppDb, organizationId: string, challengeI
   return row ?? null;
 }
 
+/** Whether a challenge has any submission row at all — the timezone-lock condition (UX-A locked decision #8), factored out so the Settings UI can show the same lock updateChallenge enforces, not just discover it via a failed save. Caller is responsible for workspace ownership, same as elsewhere in this file. */
+export async function challengeHasSubmissions(db: AppDb, challengeId: string): Promise<boolean> {
+  const [row] = await db.select({ id: submission.id }).from(submission).where(eq(submission.challengeId, challengeId)).limit(1);
+  return !!row;
+}
+
 export interface UpdateChallengeInput {
   name: string;
   startDate: string;
   endDate: string;
   timezone: string;
   status: "draft" | "active";
+  // Optional because the Settings UI doesn't expose this control yet
+  // (UX-A Phase 4/5) — omitting it leaves the existing value untouched
+  // rather than forcing every caller to resend it.
+  dailyReviewLimit?: number;
 }
 
 export type UpdateChallengeResult = { outcome: "updated" } | { outcome: "invalid"; reason: string } | { outcome: "not_found" };
+
+const DAILY_REVIEW_LIMIT_MIN = 50;
+const DAILY_REVIEW_LIMIT_MAX = 500;
 
 /**
  * Hashtag is deliberately not editable after creation — once a sync has run
  * against it, changing it would orphan the cached hashtagId and any
  * already-discovered submissions. Keeping it immutable avoids that whole
  * class of ambiguity for the MVP rather than half-solving it.
+ *
+ * Timezone is editable only until the challenge has its first submission
+ * (UX-A locked decision #8) — changing it afterward would retroactively
+ * shift every already-assigned challengeLocalDay, silently breaking day
+ * isolation for anything already synced. Checked with a targeted `exists`
+ * query rather than a join, since this function otherwise never touches
+ * the submission table.
  */
 export async function updateChallenge(
   db: AppDb,
@@ -116,6 +136,21 @@ export async function updateChallenge(
   if (input.startDate > input.endDate) return { outcome: "invalid", reason: "The end date must be on or after the start date." };
   if (!isValidTimeZone(input.timezone)) return { outcome: "invalid", reason: "Choose a valid timezone." };
   if (input.status !== "draft" && input.status !== "active") return { outcome: "invalid", reason: "Invalid status." };
+  if (
+    input.dailyReviewLimit !== undefined &&
+    (!Number.isInteger(input.dailyReviewLimit) ||
+      input.dailyReviewLimit < DAILY_REVIEW_LIMIT_MIN ||
+      input.dailyReviewLimit > DAILY_REVIEW_LIMIT_MAX)
+  ) {
+    return { outcome: "invalid", reason: `Daily review limit must be between ${DAILY_REVIEW_LIMIT_MIN} and ${DAILY_REVIEW_LIMIT_MAX}.` };
+  }
+
+  const existing = await getChallenge(db, organizationId, challengeId);
+  if (!existing) return { outcome: "not_found" };
+
+  if (input.timezone !== existing.timezone && (await challengeHasSubmissions(db, challengeId))) {
+    return { outcome: "invalid", reason: "Timezone can't be changed once the challenge has submissions." };
+  }
 
   const result = await db
     .update(challenge)
@@ -125,6 +160,7 @@ export async function updateChallenge(
       endDate: input.endDate,
       timezone: input.timezone,
       status: input.status,
+      ...(input.dailyReviewLimit !== undefined ? { dailyReviewLimit: input.dailyReviewLimit } : {}),
     })
     .where(and(eq(challenge.id, challengeId), eq(challenge.organizationId, organizationId)))
     .returning({ id: challenge.id });

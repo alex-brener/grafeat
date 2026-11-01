@@ -57,6 +57,14 @@ export const challenge = pgTable(
     // same as dailyProcessingCapacity). See the Slice B allocation-cutoff
     // proposal.
     processingGracePeriodHours: integer("processing_grace_period_hours").notNull().default(3),
+    // UX-A: how many eligible submissions get admitted into a challenge-
+    // local day's stable review sample (lib/review-pool.ts), configured once
+    // per challenge in Settings — distinct from dailyProcessingCapacity
+    // above, which governs verification spend, not display. Always a
+    // concrete bounded value (no "unlimited" sentinel, unlike
+    // dailyProcessingCapacity) — the 50-500 range and 200 default are a
+    // locked product decision, not a technical constraint.
+    dailyReviewLimit: integer("daily_review_limit").notNull().default(200),
     // Resume point for the discovery engine's "continue phase" (deep
     // pagination) — null means no sweep is currently in progress. Set to
     // the next page's `after` cursor whenever a sync's time/page budget
@@ -84,6 +92,7 @@ export const challenge = pgTable(
     index("challenge_organization_id_idx").on(table.organizationId),
     check("challenge_daily_processing_capacity_nonneg", sql`${table.dailyProcessingCapacity} IS NULL OR ${table.dailyProcessingCapacity} >= 0`),
     check("challenge_grace_period_nonneg", sql`${table.processingGracePeriodHours} >= 0`),
+    check("challenge_daily_review_limit_range", sql`${table.dailyReviewLimit} BETWEEN 50 AND 500`),
   ]
 );
 

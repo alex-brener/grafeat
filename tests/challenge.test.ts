@@ -6,9 +6,10 @@ import {
   listChallenges,
   getChallenge,
   updateChallenge,
+  challengeHasSubmissions,
   type CreateChallengeInput,
 } from "@/lib/challenge";
-import { user, organization, challenge } from "@/lib/db/schema";
+import { user, organization, challenge, submission } from "@/lib/db/schema";
 
 function baseInput(overrides: Partial<CreateChallengeInput> = {}): CreateChallengeInput {
   return {
@@ -135,6 +136,7 @@ describe("updateChallenge", () => {
       endDate: "2026-11-05",
       timezone: "UTC",
       status: "active",
+      dailyReviewLimit: 200,
     });
     expect(result.outcome).toBe("updated");
 
@@ -153,6 +155,7 @@ describe("updateChallenge", () => {
       endDate: "2026-10-31",
       timezone: "UTC",
       status: "active",
+      dailyReviewLimit: 200,
     });
     expect(result.outcome).toBe("not_found");
 
@@ -167,7 +170,75 @@ describe("updateChallenge", () => {
       endDate: "2026-10-31",
       timezone: "UTC",
       status: "active",
+      dailyReviewLimit: 200,
     });
     expect(result.outcome).toBe("invalid");
+  });
+
+  it("rejects a dailyReviewLimit outside the 50-500 range", async () => {
+    const result = await updateChallenge(ctx.db, "org-a", challengeId, {
+      name: "Creative October 2026",
+      startDate: "2026-10-01",
+      endDate: "2026-10-31",
+      timezone: "UTC",
+      status: "active",
+      dailyReviewLimit: 10,
+    });
+    expect(result.outcome).toBe("invalid");
+
+    const row = await getChallenge(ctx.db, "org-a", challengeId);
+    expect(row?.dailyReviewLimit).toBe(200); // unchanged
+  });
+
+  it("allows a timezone change before any submission exists", async () => {
+    // baseInput() creates the challenge with timezone "America/New_York" —
+    // "UTC" is a genuine change, not a no-op.
+    const result = await updateChallenge(ctx.db, "org-a", challengeId, {
+      name: "Creative October 2026",
+      startDate: "2026-10-01",
+      endDate: "2026-10-31",
+      timezone: "UTC",
+      status: "active",
+      dailyReviewLimit: 200,
+    });
+    expect(result.outcome).toBe("updated");
+
+    const row = await getChallenge(ctx.db, "org-a", challengeId);
+    expect(row?.timezone).toBe("UTC");
+  });
+
+  it("refuses a timezone change once the challenge has a submission", async () => {
+    await ctx.db.insert(submission).values({
+      challengeId,
+      mediaId: "media-1",
+      publishedAt: new Date("2026-10-05T12:00:00Z"),
+      challengeLocalDay: "2026-10-05",
+    });
+
+    const result = await updateChallenge(ctx.db, "org-a", challengeId, {
+      name: "Creative October 2026",
+      startDate: "2026-10-01",
+      endDate: "2026-10-31",
+      timezone: "UTC",
+      status: "active",
+      dailyReviewLimit: 200,
+    });
+    expect(result.outcome).toBe("invalid");
+
+    const row = await getChallenge(ctx.db, "org-a", challengeId);
+    expect(row?.timezone).toBe("America/New_York"); // untouched
+  });
+
+  it("challengeHasSubmissions reflects reality before and after a submission exists", async () => {
+    expect(await challengeHasSubmissions(ctx.db, challengeId)).toBe(false);
+
+    await ctx.db.insert(submission).values({
+      challengeId,
+      mediaId: "media-1",
+      publishedAt: new Date("2026-10-05T12:00:00Z"),
+      challengeLocalDay: "2026-10-05",
+    });
+
+    expect(await challengeHasSubmissions(ctx.db, challengeId)).toBe(true);
   });
 });

@@ -484,6 +484,80 @@
   font-size: 12.5px;
 }
 
+/* --- Stepper (Curate / Compose / Publish) --- */
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 10px 0 20px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stepNumber {
+  font-variant-numeric: tabular-nums;
+}
+
+.step_active {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-weight: 600;
+}
+
+.step_locked {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.stepDivider {
+  width: 18px;
+  height: 1px;
+  background: var(--color-border-strong);
+}
+
+/* --- Challenge switcher --- */
+
+.challengeSwitcher {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.settingsLink {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-olive);
+  text-decoration: none;
+}
+
+.settingsLink:hover {
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .breadcrumb,
   .input,

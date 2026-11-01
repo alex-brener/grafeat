@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { listChallenges } from "@/lib/challenge";
+import { getChallengeSyncStats } from "@/lib/sync-stats";
 import { deriveChallengeStatus } from "@/lib/timezone";
 import { ensureActiveWorkspace } from "@/lib/workspace-bootstrap";
 import { DashboardShell } from "../DashboardShell";
@@ -17,7 +18,13 @@ export default async function ChallengesPage() {
   }
 
   const workspace = await ensureActiveWorkspace(headersList);
-  const challenges = workspace ? await listChallenges(getDb(), workspace.id) : [];
+  const db = getDb();
+  const challenges = workspace ? await listChallenges(db, workspace.id) : [];
+  // One query per challenge — fine at pilot scale (a handful of challenges
+  // per workspace); revisit only if a real workspace ever has enough
+  // challenges for this to matter (same judgment call as elsewhere in this
+  // codebase: lib/sync-stats.ts's own per-challenge read).
+  const statsByChallenge = await Promise.all(challenges.map((c) => getChallengeSyncStats(db, c.id)));
 
   return (
     <DashboardShell email={session.user.email}>
@@ -32,8 +39,9 @@ export default async function ChallengesPage() {
       {challenges.length > 0 ? (
         <>
           <ul className={styles.list}>
-            {challenges.map((c) => {
+            {challenges.map((c, i) => {
               const displayStatus = deriveChallengeStatus(c.status, c.endDate, c.timezone);
+              const s = statsByChallenge[i];
               return (
                 <li key={c.id}>
                   <a href={`/dashboard/challenges/${c.id}`} className={styles.listRow}>
@@ -41,6 +49,10 @@ export default async function ChallengesPage() {
                       <span className={styles.listRowName}>{c.name}</span>
                       <span className={styles.listRowMeta}>
                         #{c.hashtag} · {c.startDate} – {c.endDate}
+                      </span>
+                      <span className={styles.listRowMeta}>
+                        {s.discovered} discovered · {s.eligible} eligible
+                        {s.lastSyncRun ? ` · last sync ${s.lastSyncRun.status}` : " · never synced"}
                       </span>
                     </span>
                     <span

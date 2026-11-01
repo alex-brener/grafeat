@@ -2,18 +2,29 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
-import { getChallenge } from "@/lib/challenge";
+import { getChallenge, listChallenges } from "@/lib/challenge";
 import { getChallengeSyncStats } from "@/lib/sync-stats";
-import { getGallerySubmissions, getDiagnosticSummary } from "@/lib/submission-gallery";
+import {
+  getGallerySubmissions,
+  getDiagnosticSummary,
+  getSelectedSubmissions,
+  getDayStats,
+  getNotYetSampledCount,
+  listChallengeDays,
+  pickDefaultDay,
+  EMPTY_DIAGNOSTIC_COUNTS,
+} from "@/lib/submission-gallery";
 import { deriveChallengeStatus } from "@/lib/timezone";
 import { ensureActiveWorkspace } from "@/lib/workspace-bootstrap";
 import { DashboardShell } from "../../DashboardShell";
-import { ChallengeForm } from "../ChallengeForm";
 import { SyncButton } from "../SyncButton";
-import { SubmissionGallery } from "../SubmissionGallery";
-import { DiagnosticsPanel } from "../DiagnosticsPanel";
+import { CurationWorkspace, type DayStats } from "../CurationWorkspace";
+import { CurateStepper } from "../CurateStepper";
+import { ChallengeSwitcher } from "../ChallengeSwitcher";
 import dashboardStyles from "../../Dashboard.module.css";
 import styles from "../Challenges.module.css";
+
+const EMPTY_DAY_STATS: DayStats = { discovered: 0, completed: 0, eligible: 0, sampled: 0, selected: 0 };
 
 export default async function ChallengeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const headersList = await headers();
@@ -35,34 +46,55 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
 
   const displayStatus = deriveChallengeStatus(c.status, c.endDate, c.timezone);
   const db = getDb();
-  // These three are independent of each other (each only needs c.id/workspace.id,
-  // already resolved above) but were previously awaited one at a time — each a
-  // separate Neon round-trip (~150-200ms each here, dominated by network RTT
-  // rather than query cost). Measured directly against this challenge's real
-  // data: ~1.1s sequential vs ~0.3s running them concurrently.
-  const [stats, galleryPage, diagnosticsSummary] = await Promise.all([
+  // UX-A: the curation surface is scoped to one challenge-local day at a
+  // time. Resolve the day list first (powers the day switcher), then the
+  // default day (latest grace-elapsed day; null if none has cleared grace
+  // yet) before fetching anything day-scoped.
+  const daysResult = await listChallengeDays(db, workspace.id, c.id);
+  const days = daysResult.outcome === "ok" ? daysResult.days : [];
+  const day = pickDefaultDay(days);
+  // Independent of each other (each only needs c.id/workspace.id, already
+  // resolved above) — run concurrently rather than one at a time (each a
+  // separate Neon round-trip, dominated by network RTT rather than query
+  // cost; see the Slice B QA measurement this pattern was introduced for).
+  const [stats, galleryPage, diagnosticsSummary, selectedResult, dayStatsResult, notYetSampledResult, allChallenges] = await Promise.all([
     getChallengeSyncStats(db, c.id),
-    getGallerySubmissions(db, workspace.id, c.id, null),
-    getDiagnosticSummary(db, workspace.id, c.id),
+    day ? getGallerySubmissions(db, workspace.id, c.id, day, null) : Promise.resolve({ outcome: "ok" as const, items: [], nextCursor: null }),
+    day ? getDiagnosticSummary(db, workspace.id, c.id, day) : Promise.resolve({ outcome: "ok" as const, counts: EMPTY_DIAGNOSTIC_COUNTS }),
+    day ? getSelectedSubmissions(db, workspace.id, c.id, day) : Promise.resolve({ outcome: "ok" as const, items: [] }),
+    day ? getDayStats(db, workspace.id, c.id, day) : Promise.resolve({ outcome: "ok" as const, stats: EMPTY_DAY_STATS }),
+    day ? getNotYetSampledCount(db, workspace.id, c.id, day) : Promise.resolve({ outcome: "ok" as const, count: 0 }),
+    listChallenges(db, workspace.id),
   ]);
   const galleryItems = galleryPage.outcome === "ok" ? galleryPage.items.map((item) => ({ ...item, publishedAt: item.publishedAt.toISOString() })) : [];
   const galleryNextCursor = galleryPage.outcome === "ok" ? galleryPage.nextCursor : null;
-  const diagnosticsCounts =
-    diagnosticsSummary.outcome === "ok" ? diagnosticsSummary.counts : { pending: 0, technical_failure: 0, not_verified: 0, outside_dates: 0 };
+  const diagnosticsCounts = diagnosticsSummary.outcome === "ok" ? diagnosticsSummary.counts : EMPTY_DIAGNOSTIC_COUNTS;
+  const selectedItems = selectedResult.outcome === "ok" ? selectedResult.items.map((item) => ({ ...item, publishedAt: item.publishedAt.toISOString() })) : [];
+  const dayStats = dayStatsResult.outcome === "ok" ? dayStatsResult.stats : EMPTY_DAY_STATS;
+  const notYetSampled = notYetSampledResult.outcome === "ok" ? notYetSampledResult.count : 0;
 
   return (
     <DashboardShell email={session.user.email}>
-      <div>
-        <a href="/dashboard/challenges" className={styles.breadcrumb}>
-          ← Challenges
-        </a>
-        <h1 className={styles.heading}>{c.name}</h1>
-        <p className={styles.sub}>
-          <span className={`${dashboardStyles.statusBadge} ${dashboardStyles[`statusBadge_${displayStatus}`]}`}>
-            {displayStatus}
-          </span>
-        </p>
+      <div className={styles.headerRow}>
+        <div>
+          <a href="/dashboard/challenges" className={styles.breadcrumb}>
+            ← Challenges
+          </a>
+          <h1 className={styles.heading}>{c.name}</h1>
+          <p className={styles.sub}>
+            <span className={`${dashboardStyles.statusBadge} ${dashboardStyles[`statusBadge_${displayStatus}`]}`}>
+              {displayStatus}
+            </span>
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <ChallengeSwitcher challenges={allChallenges} currentId={c.id} />
+          <a href={`/dashboard/challenges/${c.id}/settings`} className={styles.settingsLink}>
+            Settings
+          </a>
+        </div>
       </div>
+      <CurateStepper />
 
       <section className={styles.card}>
         <div className={styles.detailRow}>
@@ -119,48 +151,29 @@ export default async function ChallengeDetailPage({ params }: { params: Promise<
       </section>
 
       <section>
-        <h2 className={dashboardStyles.sectionTitle}>Gallery</h2>
+        <h2 className={dashboardStyles.sectionTitle}>Curate</h2>
         {/*
-          SubmissionGallery seeds its own client-side state from
-          initialItems/initialNextCursor via useState — that initializer
-          only runs on mount, so a bare router.refresh() (SyncButton, on a
-          successful sync) re-renders this server component with fresh
-          props but leaves the already-mounted gallery's state untouched,
-          leaving it stuck empty until a full page reload. Keying it to the
-          last completed sync forces exactly this component to remount
-          (and re-seed from the new props) whenever a sync actually
-          finishes, while staying stable — and preserving in-progress
-          client state — between syncs.
+          CurationWorkspace seeds its own client-side state from these
+          initial* props via useState — that initializer only runs on
+          mount, so a bare router.refresh() (SyncButton, on a successful
+          sync) re-renders this server component with fresh props but
+          leaves the already-mounted workspace's state untouched, stuck
+          stale until a full page reload. Keying it to the last completed
+          sync forces exactly this component to remount (and re-seed from
+          the new props) whenever a sync actually finishes, while staying
+          stable — and preserving in-progress client state — between syncs.
         */}
-        <SubmissionGallery
+        <CurationWorkspace
           key={stats.lastSyncRun?.completedAt?.toISOString() ?? "no-sync-yet"}
           challengeId={c.id}
-          initialItems={galleryItems}
-          initialNextCursor={galleryNextCursor}
+          initialDay={day}
+          initialDays={days}
+          initialReady={{ items: galleryItems, nextCursor: galleryNextCursor }}
+          initialDiagnosticCounts={diagnosticsCounts}
+          initialSelected={selectedItems}
+          initialStats={dayStats}
+          initialNotYetSampled={notYetSampled}
         />
-      </section>
-
-      <section>
-        <h2 className={dashboardStyles.sectionTitle}>Diagnostics</h2>
-        <p className={styles.sub}>Submissions not yet in the gallery, grouped by why — read-only.</p>
-        <DiagnosticsPanel challengeId={c.id} initialCounts={diagnosticsCounts} />
-      </section>
-
-      <section>
-        <h2 className={dashboardStyles.sectionTitle}>Edit</h2>
-        <div className={styles.card}>
-          <ChallengeForm
-            mode="edit"
-            challengeId={c.id}
-            initial={{
-              name: c.name,
-              startDate: c.startDate,
-              endDate: c.endDate,
-              timezone: c.timezone,
-              status: c.status,
-            }}
-          />
-        </div>
       </section>
     </DashboardShell>
   );

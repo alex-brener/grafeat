@@ -110,6 +110,14 @@ export const submission = pgTable(
     // The curator's decision. Sync upserts must never set this column —
     // only the explicit select/reject route touches it after initial insert.
     reviewStatus: reviewStatusEnum("review_status").notNull().default("unreviewed"),
+    // UX-A: whether this submission has been admitted into its
+    // challengeLocalDay's stable review sample (lib/review-pool.ts).
+    // Monotonic — only ever flips false -> true, never back. This is the
+    // persisted membership that makes the sample stable across reloads,
+    // pagination, and later syncs: the gallery/tray queries filter on this
+    // column directly rather than re-deriving a top-N by allocationRank at
+    // read time, which would silently reshuffle as new rows become eligible.
+    sampledForReview: boolean("sampled_for_review").notNull().default(false),
     discoveredAt: timestamp("discovered_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

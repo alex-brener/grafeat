@@ -24,6 +24,9 @@ type Props =
         endDate: string;
         timezone: string;
         status: "draft" | "active";
+        dailyReviewLimit: number;
+        /** Locks the timezone field client-side — mirrors updateChallenge's own server-side guard (lib/challenge.ts), so this shows up as a disabled field with an explanation instead of a late API error. */
+        hasSubmissions: boolean;
       };
     };
 
@@ -39,6 +42,9 @@ export function ChallengeForm(props: Props) {
   const [timezone, setTimezone] = useState(props.mode === "edit" ? props.initial.timezone : "");
   const [status, setStatus] = useState<"draft" | "active">(
     props.mode === "edit" ? props.initial.status : "draft"
+  );
+  const [dailyReviewLimit, setDailyReviewLimit] = useState(
+    props.mode === "edit" ? String(props.initial.dailyReviewLimit) : "200"
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +81,7 @@ export function ChallengeForm(props: Props) {
         const res = await fetch(`/api/challenges/${props.challengeId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, startDate, endDate, timezone, status }),
+          body: JSON.stringify({ name, startDate, endDate, timezone, status, dailyReviewLimit: Number(dailyReviewLimit) }),
         });
         const data = await res.json();
         if (!res.ok || !data.ok) {
@@ -167,6 +173,7 @@ export function ChallengeForm(props: Props) {
           className={styles.select}
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
+          disabled={props.mode === "edit" && props.initial.hasSubmissions}
           required
         >
           {!timezone && <option value="">Select a timezone…</option>}
@@ -176,22 +183,46 @@ export function ChallengeForm(props: Props) {
             </option>
           ))}
         </select>
-        <span className={styles.hint}>Submission dates are evaluated in this timezone.</span>
+        <span className={styles.hint}>
+          {props.mode === "edit" && props.initial.hasSubmissions
+            ? "Locked — this challenge already has submissions, so changing the timezone would shift which day they belong to."
+            : "Submission dates are evaluated in this timezone."}
+        </span>
       </label>
 
       {props.mode === "edit" && (
-        <label className={styles.field}>
-          Status
-          <select
-            className={styles.select}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as "draft" | "active")}
-          >
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-          </select>
-          <span className={styles.hint}>Draft challenges aren&apos;t synchronized yet.</span>
-        </label>
+        <>
+          <label className={styles.field}>
+            Status
+            <select
+              className={styles.select}
+              value={status}
+              onChange={(e) => setStatus(e.target.value as "draft" | "active")}
+            >
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+            </select>
+            <span className={styles.hint}>Draft challenges aren&apos;t synchronized yet.</span>
+          </label>
+
+          <label className={styles.field}>
+            Daily review limit
+            <input
+              type="number"
+              min={50}
+              max={500}
+              step={1}
+              className={styles.input}
+              value={dailyReviewLimit}
+              onChange={(e) => setDailyReviewLimit(e.target.value)}
+              required
+            />
+            <span className={styles.hint}>
+              How many eligible submissions get sampled into each day&apos;s review pool (50–500). Raising it admits more on the
+              next sync; lowering it never removes items already sampled.
+            </span>
+          </label>
+        </>
       )}
 
       <button type="submit" className={styles.submitButton} disabled={submitting}>

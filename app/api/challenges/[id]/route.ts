@@ -13,6 +13,7 @@ function toInput(body: unknown): UpdateChallengeInput {
     endDate: typeof b.endDate === "string" ? b.endDate : "",
     timezone: typeof b.timezone === "string" ? b.timezone : "",
     status: b.status === "active" ? "active" : "draft",
+    dailyReviewLimit: typeof b.dailyReviewLimit === "number" ? b.dailyReviewLimit : undefined,
   };
 }
 
