@@ -1,0 +1,135 @@
+.popover {
+  position: absolute;
+  left: 0;
+  top: 38px;
+  z-index: 250;
+  width: 272px;
+  background: #fbfaf6;
+  border: 1px solid #e2ddd1;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  padding: 14px;
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.monthLabel {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: #1d1c18;
+}
+
+.navButton {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid #cfc9bb;
+  background: transparent;
+  color: #1d1c18;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.navButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.weekdayRow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.weekdayRow span {
+  text-align: center;
+  font-size: 10.5px;
+  color: #6f6a5e;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  color: #1d1c18;
+}
+
+.cell:hover:not(:disabled) {
+  background: #eeeae0;
+}
+
+.cell:focus-visible {
+  outline: 2px solid #5c6127;
+  outline-offset: 1px;
+}
+
+.cell:disabled {
+  cursor: not-allowed;
+}
+
+.cellSelected {
+  background: #1d1c18 !important;
+  color: #f4f1ea !important;
+  font-weight: 600;
+}
+
+.cell_available {
+  box-shadow: inset 0 0 0 1.5px #5c6127;
+}
+
+.cell_available-empty {
+  color: #6f6a5e;
+  box-shadow: inset 0 0 0 1px #cfc9bb;
+}
+
+.cell_pending {
+  color: #8a6510;
+  opacity: 0.8;
+}
+
+.cell_future {
+  color: #a39e90;
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e2ddd1;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #5e5a50;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #eeeae0;
+}

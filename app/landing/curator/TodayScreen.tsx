@@ -1,5 +1,7 @@
 import styles from "./curator.module.css";
 import type { CuratorViewModel } from "./useChallengeCurator";
+import { CuratorGridCard } from "@/app/curator-shared/CuratorGridCard";
+import { CuratorTrayBar } from "@/app/curator-shared/CuratorTrayBar";
 
 export function TodayScreen({ v }: { v: CuratorViewModel }) {
   return (
@@ -101,107 +103,18 @@ export function TodayScreen({ v }: { v: CuratorViewModel }) {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(168px,1fr))", gap: "22px 16px" }}>
                 {v.gridItems.map((it) => (
-                  <div key={it.id} style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
-                    <div
-                      onClick={it.onTap}
-                      style={{ position: "relative", aspectRatio: "4/5", borderRadius: 3, overflow: "hidden", cursor: "pointer", background: "#E9E4D8" }}
-                    >
-                      {it.art}
-                      {it.selected && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            boxShadow: "inset 0 0 0 3px #5C6127",
-                            borderRadius: 3,
-                            background: "rgba(92,97,39,.12)",
-                          }}
-                        />
-                      )}
-                      {it.isVideo && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: 8,
-                            top: 8,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                            padding: "3px 7px",
-                            borderRadius: 4,
-                            background: "rgba(22,21,18,.72)",
-                            color: "#F4F1EA",
-                            fontSize: 11,
-                            fontWeight: 600,
-                          }}
-                        >
-                          <span style={{ fontSize: 8 }}>▶</span>Reel {it.dur}
-                        </div>
-                      )}
-                      {it.selected && (
-                        <div
-                          onClick={it.onToggle}
-                          style={{
-                            position: "absolute",
-                            right: 8,
-                            top: 8,
-                            width: 30,
-                            height: 30,
-                            borderRadius: "50%",
-                            background: "#5C6127",
-                            color: "#fff",
-                            fontWeight: 700,
-                            fontSize: 13,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {it.selNum}
-                        </div>
-                      )}
-                      {it.unselected && (
-                        <div
-                          onClick={it.onToggle}
-                          style={{
-                            position: "absolute",
-                            right: 8,
-                            top: 8,
-                            width: 30,
-                            height: 30,
-                            borderRadius: "50%",
-                            border: "1.5px solid rgba(255,255,255,.95)",
-                            background: "rgba(22,21,18,.22)",
-                          }}
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={it.onOpen}
-                        style={{
-                          position: "absolute",
-                          right: 8,
-                          bottom: 8,
-                          height: 26,
-                          padding: "0 10px",
-                          borderRadius: 999,
-                          border: "none",
-                          background: "rgba(251,250,246,.9)",
-                          color: "#1D1C18",
-                          cursor: "pointer",
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                        }}
-                      >
-                        View
-                      </button>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5 }}>
-                      <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{it.handle}</span>
-                      <span style={{ color: "#6F6A5E", flex: "none", fontVariantNumeric: "tabular-nums" }}>{it.time}</span>
-                    </div>
-                  </div>
+                  <CuratorGridCard
+                    key={it.id}
+                    art={it.art}
+                    onToggle={it.onTap}
+                    selected={it.selected}
+                    selNum={it.selNum}
+                    isVideo={it.isVideo}
+                    dur={it.dur}
+                    onView={it.onOpen}
+                    handle={it.handle}
+                    time={it.time}
+                  />
                 ))}
               </div>
             </>
@@ -262,92 +175,17 @@ export function TodayScreen({ v }: { v: CuratorViewModel }) {
         </div>
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 18,
-          padding: "12px 20px",
-          background: "rgba(251,250,246,.97)",
-          borderTop: "1px solid #E2DDD1",
-          boxShadow: "0 -8px 24px rgba(29,28,24,.05)",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", flex: "none" }}>
-          <span style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#5E5A50", fontWeight: 600 }}>
-            Today&apos;s feature
-          </span>
-          <span style={{ fontFamily: "var(--font-serif)", fontSize: 26, lineHeight: 1.05, fontVariantNumeric: "tabular-nums" }}>
-            {v.selCount} <span style={{ color: "#6F6A5E" }}>of 10</span>
-          </span>
-        </div>
-        {v.wide && (
-          <div style={{ display: "flex", gap: 6, minWidth: 0, overflow: "hidden" }}>
-            {v.slots.map((sl, i) =>
-              sl.filled ? (
-                <div
-                  key={i}
-                  onClick={sl.onClick}
-                  style={{ position: "relative", width: 40, height: 50, flex: "none", borderRadius: 3, overflow: "hidden", cursor: "pointer" }}
-                >
-                  {sl.art}
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 3,
-                      bottom: 3,
-                      minWidth: 16,
-                      height: 16,
-                      padding: "0 3px",
-                      borderRadius: 8,
-                      background: "#5C6127",
-                      color: "#fff",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {sl.num}
-                  </span>
-                </div>
-              ) : (
-                <div key={i} style={{ width: 40, height: 50, flex: "none", borderRadius: 3, border: "1px dashed #CFC9BB" }} />
-              )
-            )}
-          </div>
-        )}
-        <div style={{ flex: 1 }} />
-        {v.noSel && <span style={{ fontSize: 13, color: "#5E5A50", textAlign: "right" }}>Pick up to 10 works for today&apos;s carousel</span>}
-        {v.hasSel && (
-          <button
-            type="button"
-            onClick={v.goCompose}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              height: 42,
-              padding: "0 18px",
-              borderRadius: 6,
-              border: "none",
-              background: "#1D1C18",
-              color: "#F4F1EA",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Compose feature <span>→</span>
-          </button>
-        )}
-      </div>
+      <CuratorTrayBar
+        eyebrow="Today's feature"
+        count={v.selCount}
+        max={10}
+        wide={v.wide}
+        slots={v.slots.filter((sl) => sl.filled).map((sl, i) => ({ id: String(i), art: sl.art, num: sl.num!, onClick: sl.onClick! }))}
+        ctaLabel="Compose feature"
+        ctaDisabled={false}
+        onCta={v.goCompose}
+        emptyHint="Pick up to 10 works for today's carousel"
+      />
     </>
   );
 }

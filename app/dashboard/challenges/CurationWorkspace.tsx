@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { isGraceElapsed } from "@/lib/timezone";
+import { CuratorPageShell } from "../CuratorPageShell";
+import { CuratorGridCard } from "@/app/curator-shared/CuratorGridCard";
+import { CuratorLightbox, type CuratorCheck } from "@/app/curator-shared/CuratorLightbox";
+import { CuratorTrayBar } from "@/app/curator-shared/CuratorTrayBar";
+import { useWideBreakpoint } from "@/app/curator-shared/useWideBreakpoint";
+import { DayPicker } from "./DayPicker";
 import styles from "./CurationWorkspace.module.css";
 
 export interface WorkspaceItem {
@@ -78,15 +86,27 @@ function emptyCategoryStateMap(): Record<DiagnosticCategory, CategoryState> {
   };
 }
 
-function formatDay(day: string): string {
-  // Challenge-local calendar date — deliberately parsed as a plain date,
-  // not re-interpreted through the viewer's own browser timezone.
+function addDays(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+function formatDayHeading(day: string): { eyebrow: string; dayNumber: number | null } {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const date = new Date(y, m - 1, d);
+  const eyebrow = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  return { eyebrow, dayNumber: null };
 }
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function formatDayShort(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 interface LightboxRef {
@@ -100,7 +120,18 @@ interface LightboxRef {
 }
 
 export interface CurationWorkspaceProps {
+  email: string;
   challengeId: string;
+  challengeName: string;
+  /** Not shown anywhere in the demo (its challenges have no draft/ended concept) — kept visible here since it's real, meaningful product state the previous implementation surfaced and removing it silently would be a real regression, not just a cosmetic one. */
+  challengeStatus: "draft" | "active" | "ended";
+  hashtag: string;
+  requiredMention: string;
+  challengeStartDate: string;
+  challengeEndDate: string;
+  timezone: string;
+  processingGracePeriodHours: number;
+  lastSyncSummary: string | null;
   initialDay: string | null;
   initialDays: WorkspaceDay[];
   initialReady: { items: WorkspaceItem[]; nextCursor: string | null };
@@ -108,21 +139,28 @@ export interface CurationWorkspaceProps {
   initialSelected: WorkspaceItem[];
   initialStats: DayStats;
   initialNotYetSampled: number;
+  /** Server-rendered sync status/stats + the SyncButton — kept visually secondary (below the curation surface), not fabricated, and not part of the demo's own visual language (the demo has no real discovery/processing). */
+  syncSection: ReactNode;
 }
 
 /**
- * The real, demo-aligned curation surface (UX-A) — replaces the previous
- * SubmissionGallery/DiagnosticsPanel pair. One client component owns all
- * shared state (day, tab, lists, pending mutations), mirroring the landing
- * demo's own "one hook, one view" architecture (useChallengeCurator.ts) —
- * deliberately not split into independently-stateful children, since
- * selecting/rejecting an item has to be reflected consistently across the
- * Ready grid, the Set-aside "rejected" category, the tray, and the
- * lightbox simultaneously (UX-A locked decision #6: one shared
- * optimistic-mutation path, not four).
+ * The real, demo-aligned curation surface (UX-A). One client component
+ * owns all shared state (day, tab, lists, pending mutations), mirroring
+ * the landing demo's own "one hook, one view" architecture
+ * (useChallengeCurator.ts) — deliberately not split into
+ * independently-stateful children, since selecting/rejecting an item has
+ * to be reflected consistently across the Ready grid, the Set-aside
+ * "rejected" category, the tray, and the lightbox simultaneously (UX-A
+ * locked decision #6: one shared optimistic-mutation path, not four).
+ *
+ * Now also owns the page shell (CuratorPageShell/CuratorChrome) and the
+ * header day picker, since both need the same day state this component
+ * already manages — visual-parity + day-navigation pass.
  */
 export function CurationWorkspace(props: CurationWorkspaceProps) {
-  const { challengeId } = props;
+  const { challengeId, challengeName, hashtag, requiredMention, challengeStartDate, challengeEndDate, timezone, processingGracePeriodHours } = props;
+  const router = useRouter();
+  const wide = useWideBreakpoint();
   const [day, setDay] = useState(props.initialDay);
   const [days, setDays] = useState(props.initialDays);
   const [tab, setTab] = useState<"ready" | "aside">("ready");
@@ -176,6 +214,10 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
       setCategoryState(emptyCategoryStateMap());
       setDay(newDay);
       setTab("ready");
+      setLightbox(null);
+      const url = new URL(window.location.href);
+      url.searchParams.set("day", newDay);
+      router.replace(`${url.pathname}?${url.searchParams.toString()}`, { scroll: false });
     } catch (err) {
       setDayError(err instanceof Error ? err.message : "Could not switch days — please try again.");
     } finally {
@@ -352,42 +394,95 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
   const asideTotal = useMemo(() => DIAGNOSTIC_CATEGORIES.reduce((sum, c) => sum + diagCounts[c], 0), [diagCounts]);
   const readyTotal = Math.max(0, stats.sampled - diagCounts.rejected);
 
+  // Adjacent-available-day lookup for the Curate prev/next shortcuts —
+  // steps through real calendar days (not just days with submissions, per
+  // "do not assume all challenge days have submissions"), using the same
+  // pure isGraceElapsed function the DayPicker popover uses. No separate
+  // "is this day in the future" check is needed: isGraceElapsed already
+  // returns false for any day whose end-of-day-plus-grace hasn't happened
+  // yet, which is automatically true for every future day too.
+  function isDayAvailable(d: string): boolean {
+    if (d < challengeStartDate || d > challengeEndDate) return false;
+    const known = days.find((x) => x.day === d);
+    return known ? known.graceElapsed : isGraceElapsed(d, timezone, processingGracePeriodHours);
+  }
+  function findAdjacentAvailableDay(from: string, direction: 1 | -1): string | null {
+    let cur = from;
+    for (let i = 0; i < 400; i++) {
+      cur = addDays(cur, direction);
+      if (cur < challengeStartDate || cur > challengeEndDate) return null;
+      if (isDayAvailable(cur)) return cur;
+    }
+    return null;
+  }
+  const prevDay = day ? findAdjacentAvailableDay(day, -1) : null;
+  const nextDay = day ? findAdjacentAvailableDay(day, 1) : null;
+
+  const dayPickerSlot = day ? (
+    <DayPicker
+      daysWithData={days}
+      selectedDay={day}
+      challengeStartDate={challengeStartDate}
+      challengeEndDate={challengeEndDate}
+      timezone={timezone}
+      processingGracePeriodHours={processingGracePeriodHours}
+      onSelect={selectDay}
+      disabled={dayLoading}
+    />
+  ) : undefined;
+
   if (!day) {
     return (
-      <div>
+      <CuratorPageShell email={props.email} challengeContext={{ id: challengeId, name: challengeName }} activeStep="curate" maxWidth={1440}>
         <p className={styles.notYetSampled}>
           No challenge-local day has cleared its grace period yet — nothing to review until the first full publication day ends and the grace
           period elapses. Run a sync once that happens.
         </p>
-      </div>
+        {props.syncSection}
+      </CuratorPageShell>
     );
   }
 
+  const { eyebrow } = formatDayHeading(day);
+  const dayNumber = Math.round((new Date(day).getTime() - new Date(challengeStartDate).getTime()) / 86400000) + 1;
+  const totalDays = Math.round((new Date(challengeEndDate).getTime() - new Date(challengeStartDate).getTime()) / 86400000) + 1;
+
   return (
-    <div>
-      <div className={styles.daySwitcher} role="tablist" aria-label="Challenge day">
-        {days.map((d) => (
-          <button
-            key={d.day}
-            type="button"
-            role="tab"
-            aria-selected={d.day === day}
-            disabled={dayLoading}
-            onClick={() => (d.graceElapsed ? selectDay(d.day) : undefined)}
-            className={`${styles.dayButton} ${d.day === day ? styles.dayButton_active : ""} ${!d.graceElapsed ? styles.dayButtonFuture : ""}`}
-            title={d.graceElapsed ? undefined : "This day hasn't cleared its grace period yet — no review pool until it does."}
-          >
-            {formatDay(d.day)}
-            {!d.graceElapsed ? " (pending)" : ""}
-          </button>
-        ))}
+    <CuratorPageShell email={props.email} challengeContext={{ id: challengeId, name: challengeName }} activeStep="curate" maxWidth={1440} dayTrigger={dayPickerSlot}>
+      <div className={styles.dayHeadingRow}>
+        <div className={styles.dayHeadingLeft}>
+          <div className={styles.dayHeadingArrows}>
+            <button type="button" className={styles.dayArrow} onClick={() => prevDay && selectDay(prevDay)} disabled={!prevDay || dayLoading} aria-label="Previous available day">
+              ‹
+            </button>
+            <button type="button" className={styles.dayArrow} onClick={() => nextDay && selectDay(nextDay)} disabled={!nextDay || dayLoading} aria-label="Next available day">
+              ›
+            </button>
+          </div>
+          <div>
+            <div className={styles.dayEyebrow}>
+              {eyebrow} · Day {dayNumber} of {totalDays}
+              <span className={`${styles.statusBadge} ${styles[`statusBadge_${props.challengeStatus}`]}`}>{props.challengeStatus}</span>
+            </div>
+            <h1 className={styles.dayHeading}>Day {dayNumber}</h1>
+          </div>
+        </div>
+        <div className={styles.dayHeadingRight}>
+          <div className={styles.tagRow}>
+            <span>Counted for this day when a post mentions</span>
+            <span className={styles.tag}>@{requiredMention}</span>
+            <span className={styles.tag}>#{hashtag}</span>
+            <span>and was posted {formatDayShort(day)}</span>
+          </div>
+          {props.lastSyncSummary && <div className={styles.syncStatus}>{props.lastSyncSummary}</div>}
+        </div>
       </div>
       {dayError && <p className={styles.cardError}>{dayError}</p>}
 
       <div className={styles.tabs} role="tablist">
         <button type="button" role="tab" aria-selected={tab === "ready"} onClick={() => setTab("ready")} className={`${styles.tab} ${tab === "ready" ? styles.tab_active : ""}`}>
           <span className={styles.tabCount}>{readyTotal}</span>
-          Ready
+          Ready to curate
         </button>
         <button type="button" role="tab" aria-selected={tab === "aside"} onClick={() => setTab("aside")} className={`${styles.tab} ${tab === "aside" ? styles.tab_active : ""}`}>
           <span className={styles.tabCount}>{asideTotal}</span>
@@ -408,15 +503,24 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
             <p className={styles.notYetSampled}>Nothing sampled for review yet on this day.</p>
           ) : (
             <div className={styles.grid}>
-              {readyItems.map((item, index) => (
-                <ImageCard
+              {readyItems.map((item) => (
+                <CuratorGridCard
                   key={item.id}
-                  item={item}
-                  pending={pendingIds.has(item.id)}
-                  error={itemErrors[item.id]}
-                  onTapSelect={() => handleDecision(item, item.reviewStatus === "selected" ? "unreviewed" : "selected")}
-                  onReject={() => handleDecision(item, "rejected")}
-                  onView={() => setLightbox({ source: "ready", index })}
+                  art={<CardImage item={item} />}
+                  onToggle={() => handleDecision(item, item.reviewStatus === "selected" ? "unreviewed" : "selected")}
+                  selected={item.reviewStatus === "selected"}
+                  onView={() => setLightbox({ source: "ready", index: readyItems.indexOf(item) })}
+                  handle={item.creatorUsername ?? "unknown"}
+                  time={formatDateTime(item.publishedAt)}
+                  disabled={pendingIds.has(item.id)}
+                  footerSlot={
+                    <div className={styles.cardActions}>
+                      <button type="button" className={styles.rejectButton} onClick={() => handleDecision(item, "rejected")} disabled={pendingIds.has(item.id)}>
+                        Reject
+                      </button>
+                      {itemErrors[item.id] && <span className={styles.cardError}>{itemErrors[item.id]}</span>}
+                    </div>
+                  }
                 />
               ))}
             </div>
@@ -435,7 +539,7 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
       {tab === "aside" && (
         <div>
           <p className={styles.asideIntro}>
-            These don't meet this day's rules, or were set aside manually. Nothing is deleted — Undo always works on a manual rejection.
+            These don&apos;t meet this day&apos;s rules, or were set aside manually. Nothing is deleted — Undo always works on a manual rejection.
           </p>
           {DIAGNOSTIC_CATEGORIES.map((category) => {
             const count = diagCounts[category];
@@ -459,16 +563,25 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
                     {cs.error && <p className={styles.cardError}>{cs.error}</p>}
                     {cs.items.length > 0 && (
                       <div className={styles.grid}>
-                        {cs.items.map((item, index) => (
-                          <ImageCard
+                        {cs.items.map((item) => (
+                          <CuratorGridCard
                             key={item.id}
-                            item={item}
-                            pending={pendingIds.has(item.id)}
-                            error={itemErrors[item.id]}
-                            reason={category !== "rejected" ? CATEGORY_LABEL[category] : undefined}
-                            onUndo={category === "rejected" ? () => handleDecision(item, "unreviewed") : undefined}
-                            onView={() => setLightbox({ source: category, index })}
-                            readOnly={category !== "rejected"}
+                            art={<CardImage item={item} />}
+                            onView={() => setLightbox({ source: category, index: cs.items.indexOf(item) })}
+                            handle={item.creatorUsername ?? "unknown"}
+                            time={formatDateTime(item.publishedAt)}
+                            disabled={pendingIds.has(item.id)}
+                            footerSlot={
+                              category === "rejected" ? (
+                                <div className={styles.cardActions}>
+                                  <button type="button" className={styles.undoButton} onClick={() => handleDecision(item, "unreviewed")} disabled={pendingIds.has(item.id)}>
+                                    Undo
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className={styles.reasonTag}>{CATEGORY_LABEL[category]}</span>
+                              )
+                            }
                           />
                         ))}
                       </div>
@@ -486,40 +599,58 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
         </div>
       )}
 
-      <section style={{ marginTop: 36 }}>
-        <h2 style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 22, marginBottom: 12 }}>Selected for {formatDay(day)}</h2>
-        {selectedItems.length === 0 ? (
-          <p className={styles.trayEmpty}>Nothing selected yet — tap a Ready item's circle to add it here.</p>
-        ) : (
-          <div className={styles.trayGrid}>
-            {selectedItems.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                className={styles.trayArt}
-                onClick={() => setLightbox({ source: "tray", index })}
-                aria-label={item.creatorUsername ? `View @${item.creatorUsername}'s submission` : "View submission"}
-              >
-                <CardImage item={item} />
-                <span className={styles.trayBadge}>{index + 1}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      <CuratorTrayBar
+        eyebrow="Selected"
+        count={selectedItems.length}
+        max={null}
+        wide={wide}
+        position="fixed"
+        contentMaxWidth={1440}
+        slots={selectedItems.map((item, i) => ({ id: item.id, art: <CardImage item={item} />, num: i + 1, onClick: () => setLightbox({ source: "tray", index: i }) }))}
+        ctaLabel="Compose"
+        ctaDisabled
+        emptyHint="Tap a Ready item's circle to add it here"
+      />
 
       {lightboxItem && (
-        <Lightbox
-          item={lightboxItem}
-          actionable={lightboxActionable}
-          pending={pendingIds.has(lightboxItem.id)}
-          error={itemErrors[lightboxItem.id]}
+        <CuratorLightbox
+          art={<CardImage item={lightboxItem} />}
+          handle={lightboxItem.creatorUsername ?? "unknown"}
+          posted={formatDateTime(lightboxItem.publishedAt)}
+          media={lightboxItem.mediaType ?? "Image"}
+          postUrl={lightboxItem.permalink}
+          caption={lightboxItem.caption}
+          checks={buildChecks(lightboxItem)}
+          position="fixed"
           hasPrev={lightbox!.index > 0}
           hasNext={lightbox!.index < lightboxList.length - 1}
           onPrev={() => setLightbox((prev) => (prev ? { ...prev, index: Math.max(0, prev.index - 1) } : prev))}
           onNext={() => setLightbox((prev) => (prev ? { ...prev, index: Math.min(lightboxList.length - 1, prev.index + 1) } : prev))}
           onClose={() => setLightbox(null)}
-          onDecision={(decision) => handleDecision(lightboxItem, decision)}
+          actionsSlot={
+            lightboxActionable ? (
+              lightboxItem.reviewStatus === "selected" ? (
+                <button type="button" className={styles.lightboxSelectedButton} disabled={pendingIds.has(lightboxItem.id)} onClick={() => handleDecision(lightboxItem, "unreviewed")}>
+                  Selected · Remove
+                </button>
+              ) : lightboxItem.reviewStatus === "rejected" ? (
+                <button type="button" className={styles.lightboxSecondaryButton} disabled={pendingIds.has(lightboxItem.id)} onClick={() => handleDecision(lightboxItem, "unreviewed")}>
+                  Undo rejection
+                </button>
+              ) : (
+                <>
+                  <button type="button" className={styles.lightboxPrimaryButton} disabled={pendingIds.has(lightboxItem.id)} onClick={() => handleDecision(lightboxItem, "selected")}>
+                    Add to feature
+                  </button>
+                  <button type="button" className={styles.lightboxSecondaryButton} disabled={pendingIds.has(lightboxItem.id)} onClick={() => handleDecision(lightboxItem, "rejected")}>
+                    Reject
+                  </button>
+                </>
+              )
+            ) : (
+              <p className={styles.lightboxMeta}>Automatic exclusion — no action available here.</p>
+            )
+          }
         />
       )}
 
@@ -528,8 +659,20 @@ export function CurationWorkspace(props: CurationWorkspaceProps) {
           {toast}
         </div>
       )}
-    </div>
+
+      <div style={{ marginTop: 60 }}>{props.syncSection}</div>
+    </CuratorPageShell>
   );
+}
+
+function buildChecks(item: WorkspaceItem): CuratorCheck[] {
+  return [
+    {
+      label: "Genuine mention verified",
+      state: item.mentionResult === "verified" ? "ok" : item.mentionResult === "not_verified" ? "fail" : "review",
+    },
+    { label: "Posted within the challenge dates", state: item.dateEligible ? "ok" : "fail" },
+  ];
 }
 
 function CardImage({ item }: { item: WorkspaceItem }) {
@@ -554,192 +697,5 @@ function CardImage({ item }: { item: WorkspaceItem }) {
         }
       }}
     />
-  );
-}
-
-interface ImageCardProps {
-  item: WorkspaceItem;
-  pending: boolean;
-  error?: string;
-  reason?: string;
-  readOnly?: boolean;
-  onTapSelect?: () => void;
-  onReject?: () => void;
-  onUndo?: () => void;
-  onView: () => void;
-}
-
-/**
- * Shared card for the Ready grid and the Set-aside "rejected" category.
- * Tap-to-select (the circular badge) and the separate Reject control are
- * deliberately distinct affordances, not a single tap-cycle (UX-A locked
- * decision #7) — tapping the badge toggles selection, Reject is its own
- * smaller control, and View opens the shared lightbox without touching
- * selection at all.
- */
-function ImageCard({ item, pending, error, reason, readOnly, onTapSelect, onReject, onUndo, onView }: ImageCardProps) {
-  function onArtKeyDown(e: ReactKeyboardEvent) {
-    if (!onTapSelect) return;
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onTapSelect();
-    }
-  }
-  return (
-    <div className={styles.card}>
-      <div
-        className={styles.cardArt}
-        role={onTapSelect ? "button" : undefined}
-        tabIndex={onTapSelect ? 0 : undefined}
-        onClick={onTapSelect}
-        onKeyDown={onArtKeyDown}
-        aria-label={onTapSelect ? (item.reviewStatus === "selected" ? "Remove from feature" : "Add to feature") : undefined}
-      >
-        <CardImage item={item} />
-        {onTapSelect && (
-          <button
-            type="button"
-            className={`${styles.selectBadge} ${item.reviewStatus === "selected" ? styles.selectBadge_selected : styles.selectBadge_unselected}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onTapSelect();
-            }}
-            disabled={pending}
-            aria-label={item.reviewStatus === "selected" ? "Remove from feature" : "Add to feature"}
-          >
-            {item.reviewStatus === "selected" ? "✓" : ""}
-          </button>
-        )}
-        <button
-          type="button"
-          className={styles.viewButton}
-          onClick={(e) => {
-            e.stopPropagation();
-            onView();
-          }}
-        >
-          View
-        </button>
-      </div>
-      <div className={styles.cardMeta}>
-        <span className={styles.cardCreator}>{item.creatorUsername ? `@${item.creatorUsername}` : "Unknown creator"}</span>
-        <span className={styles.cardDate}>{formatDateTime(item.publishedAt)}</span>
-      </div>
-      {reason && <span className={styles.reasonTag}>{reason}</span>}
-      {!readOnly && (onReject || onUndo) && (
-        <div className={styles.cardActions}>
-          {onReject && (
-            <button type="button" className={styles.rejectButton} onClick={onReject} disabled={pending || item.reviewStatus === "rejected"}>
-              Reject
-            </button>
-          )}
-          {onUndo && (
-            <button type="button" className={styles.undoButton} onClick={onUndo} disabled={pending}>
-              Undo
-            </button>
-          )}
-        </div>
-      )}
-      {error && <span className={styles.cardError}>{error}</span>}
-    </div>
-  );
-}
-
-interface LightboxProps {
-  item: WorkspaceItem;
-  /** False for the 4 automatic-exclusion categories — read-only, same as their grid cards. */
-  actionable: boolean;
-  pending: boolean;
-  error?: string;
-  hasPrev: boolean;
-  hasNext: boolean;
-  onPrev: () => void;
-  onNext: () => void;
-  onClose: () => void;
-  onDecision: (decision: WorkspaceItem["reviewStatus"]) => void;
-}
-
-/**
- * The one shared lightbox (locked decision #7) — opened from the Ready
- * grid, the Set-aside "rejected" category, or the tray, always with the
- * same real (not fabricated) eligibility checklist built from
- * mentionResult/dateEligible. Closing it (×, Escape, or the backdrop)
- * never itself changes selection — only the explicit action buttons do.
- */
-function Lightbox({ item, actionable, pending, error, hasPrev, hasNext, onPrev, onNext, onClose, onDecision }: LightboxProps) {
-  return (
-    <div className={styles.lightboxOverlay} role="dialog" aria-modal="true">
-      <div className={styles.lightboxImageArea}>
-        <button type="button" className={styles.lightboxCloseButton} onClick={onClose}>
-          Close
-        </button>
-        <button type="button" className={`${styles.lightboxNavButton} ${styles.lightboxNavButton_prev}`} onClick={onPrev} disabled={!hasPrev} aria-label="Previous">
-          ‹
-        </button>
-        <button type="button" className={`${styles.lightboxNavButton} ${styles.lightboxNavButton_next}`} onClick={onNext} disabled={!hasNext} aria-label="Next">
-          ›
-        </button>
-        <div className={styles.lightboxImage}>
-          <CardImage key={item.id} item={item} />
-        </div>
-      </div>
-      <aside className={styles.lightboxAside}>
-        <div>
-          <h3 className={styles.lightboxHandle}>{item.creatorUsername ? `@${item.creatorUsername}` : "Unknown creator"}</h3>
-          <div className={styles.lightboxMeta}>{formatDateTime(item.publishedAt)}</div>
-          {item.permalink && (
-            <a href={item.permalink} target="_blank" rel="noopener noreferrer" className={styles.lightboxMeta}>
-              Open post on Instagram ↗
-            </a>
-          )}
-        </div>
-        {item.caption && <div className={styles.lightboxCaption}>{item.caption}</div>}
-        <div className={styles.checklist}>
-          <div className={styles.checkRow}>
-            {item.mentionResult === "verified" ? (
-              <span className={`${styles.checkIcon} ${styles.checkIcon_ok}`}>✓</span>
-            ) : item.mentionResult === "not_verified" ? (
-              <span className={`${styles.checkIcon} ${styles.checkIcon_fail}`}>✕</span>
-            ) : (
-              <span className={`${styles.checkIcon} ${styles.checkIcon_pending}`}>?</span>
-            )}
-            <span>Genuine mention verified</span>
-          </div>
-          <div className={styles.checkRow}>
-            {item.dateEligible ? (
-              <span className={`${styles.checkIcon} ${styles.checkIcon_ok}`}>✓</span>
-            ) : (
-              <span className={`${styles.checkIcon} ${styles.checkIcon_fail}`}>✕</span>
-            )}
-            <span>Posted within the challenge dates</span>
-          </div>
-        </div>
-        {error && <span className={styles.cardError}>{error}</span>}
-        {actionable ? (
-          <div className={styles.lightboxActions}>
-            {item.reviewStatus === "selected" ? (
-              <button type="button" className={styles.lightboxSelectedButton} disabled={pending} onClick={() => onDecision("unreviewed")}>
-                Selected · Remove
-              </button>
-            ) : item.reviewStatus === "rejected" ? (
-              <button type="button" className={styles.lightboxSecondaryButton} disabled={pending} onClick={() => onDecision("unreviewed")}>
-                Undo rejection
-              </button>
-            ) : (
-              <>
-                <button type="button" className={styles.lightboxPrimaryButton} disabled={pending} onClick={() => onDecision("selected")}>
-                  Add to feature
-                </button>
-                <button type="button" className={styles.lightboxSecondaryButton} disabled={pending} onClick={() => onDecision("rejected")}>
-                  Reject
-                </button>
-              </>
-            )}
-          </div>
-        ) : (
-          <p className={styles.lightboxMeta}>Automatic exclusion — no action available here.</p>
-        )}
-      </aside>
-    </div>
   );
 }

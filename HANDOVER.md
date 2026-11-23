@@ -4,6 +4,69 @@
 
 ---
 
+## Most recent work — UX-A Visual Parity + Day Navigation (2026-11-01)
+
+**Status: code-complete, `tsc`/tests/build all clean. No human browser QA has been performed — do not treat anything below as visually verified.** Prompt: `prompts/grafeat-ux-a-visual-parity-and-day-navigation-claude.md`.
+
+**Repository state note (informational, not an action I took):** this work was done on local branch `feature/ux-a-curation`, which already contained one commit (`5639139`, "feat(grafeat): implement day-scoped curation workspace") when this pass began — created by your own git identity, not by me; I never ran `git commit` this session or any prior one. `main`/`origin/main` remain untouched at `6f9b7cc`, and `feature/ux-a-curation` has no upstream/remote tracking (confirmed via `git branch -vv` and `git fetch --dry-run`) — nothing has been pushed. My own changes from this pass are uncommitted working-tree changes on top of that branch, same as every prior UX-A pass — I have not committed them, per the standing boundary.
+
+**No browser automation is available in this environment** (checked via tool search — no `mcp__Claude_Browser__*`/`mcp__claude-in-chrome__*` tools present). Everything below is a source-level claim (compiles, type-checks, matches the screenshot's markup/copy/structure as read), never a pixel-verified one.
+
+### What changed, and why
+
+**Demo → real-app reuse (the core ask: "reuse, don't re-approximate"):** six new shared, data-driven presentational components in `app/curator-shared/` — `CuratorChrome` (header shell), `CuratorStepper`, `CuratorGridCard`, `CuratorLightbox`, `CuratorTrayBar`, `CuratorChallengeCard`, plus `useWideBreakpoint`. Each is extracted from the matching landing-demo file (`CuratorHeader.tsx`, `TodayScreen.tsx`'s card/tray blocks, `DetailOverlay.tsx`, `ProjectsScreen.tsx`'s row), same markup/inline-styles, but taking plain props instead of the demo's `CuratorViewModel`. The demo's own files (`CuratorHeader.tsx`, `TodayScreen.tsx`, `DetailOverlay.tsx`, `ProjectsScreen.tsx`) were refactored to call these shared components internally — the demo now sources its markup from the same code the real app uses, not a parallel copy. `CurationWorkspace.tsx` and the Challenges list were rewritten to use the same shared components with real data.
+
+**Two real bugs caught during self-review, fixed before considering this done:**
+1. `DayPicker`'s month-boundary check compared a 10-char date string (`"2026-10-01"`) against a 7-char month string (`"2026-10"`) — in JS, a longer string that merely starts with a shorter one still compares greater, so this always evaluated true and would have let the picker navigate before the challenge's start month. Fixed to compare two "YYYY-MM" strings.
+2. The tray bar's `wide` prop was hardcoded `true` instead of using the real responsive breakpoint — would have shown the thumbnail row on mobile regardless of viewport. Fixed by extracting `useWideBreakpoint` into a shared hook used by both `CuratorPageShell` (header) and `CurationWorkspace` (tray), so they can't disagree.
+
+One more fix mid-build (not a bug, a design correction before it shipped): the tray bar's fixed-position background initially used a single `maxWidth`-constrained div for both background and content, which would have shown the page's cream background bleeding through on either side on a wide screen instead of a clean full-bleed bar. Fixed with a two-layer wrapper (full-bleed background, centered content) — same pattern the demo doesn't need (its frame already is the reference box) but the real app's `max-width`-capped `<main>` does.
+
+### Day navigation (new functionality, not an extraction — the demo has no working picker behind its "Day N of M ▾" label)
+
+- **Header day picker** (`app/dashboard/challenges/DayPicker.tsx`): a compact month-grid popover replacing the old in-page pill-row day switcher. Distinguishes four states per calendar day — available (has data), available-empty (grace elapsed, zero submissions), pending (grace period still open), future — using `lib/timezone.ts`'s `isGraceElapsed`/`toZonedDateString` directly (both pure `Intl`/`Date` functions with no server-only dependency, so safe to import into a client component) rather than reimplementing the logic. Keyboard/Escape/outside-click/focus-on-open supported. `listChallengeDays` only returns days with submissions, so days with zero submissions are computed client-side via the same pure function — the one deliberate exception to "never recalculate day logic in the browser," since it's calendar-day enumeration and grace math, not a submission's own day identity (which still comes only from `challengeLocalDay`, untouched).
+- **Prev/next arrows** next to the "Day N" heading on Curate only, stepping through calendar days (not just days with data) via the same availability logic, correctly skipping pending/future days.
+- **URL persistence:** `?day=YYYY-MM-DD` query param, read server-side in `page.tsx` (an explicit, well-formed value wins over the computed default) and written client-side via `router.replace(..., { scroll: false })` on every day switch — refresh, back/forward, and shared links all land on the right day.
+- **Default-day behavior unchanged:** still the latest grace-elapsed day when no `?day=` is present — `pickDefaultDay` untouched.
+
+### Two product decisions made during the mapping/audit step, with your sign-off
+
+1. **Header/auth:** the demo's avatar is a static decorative circle with no sign-out concept. The real header's avatar is now `AvatarMenu` — click to reveal email + sign-out (reuses the existing `SignOutButton`). `DashboardShell` (generic logo+email+signout header, 880px-capped content) is replaced by a new `CuratorPageShell` for exactly three routes — the Challenges list, a challenge's Curate workspace, and its Settings page — since `DashboardShell`'s own 880px max-width was also too narrow for the demo's 1440px gallery / 1080px challenge-list layouts. `/dashboard` (home) and `/dashboard/challenges/new` are untouched, still on `DashboardShell`, out of this prompt's scope.
+2. **Fabricated metrics on the Challenges list:** the screenshot shows "15 features published," a progress bar, and 4-tile artwork mosaics — none of which exist in the real system (no Compose/Publish, no "representative artwork" concept). Per your confirmed default: honest empty/neutral placeholders. The mosaic slot renders 4 muted squares (no invented thumbnails); `progress` is always `null` (no bar, ever) rather than showing an invented percentage; the card instead shows real `discovered`/`eligible`/`last-sync` counts, same data `app/dashboard/challenges/page.tsx` already had.
+
+### Known, deliberate gaps — not fabricated, not silently dropped
+
+- **No video/Reel badge.** The demo shows "▶ Reel 0:16" on video items; `WorkspaceItem` has no reliable duration field, only a raw `mediaType` string from Meta, so this was omitted rather than guessing a duration. `CuratorGridCard`/`CuratorLightbox` both support `isVideo`/`dur` props if this data becomes available later.
+- **Lightbox media label is the raw Meta `mediaType` string** (e.g. `"IMAGE"`), not the demo's polished "Image"/"Reel 0:16" — truthful over polished, not fixed further given time.
+- **The demo's own day label was deliberately left non-interactive** (static "Day 16 of 31" text, unchanged). Making it a real picker would need new state in the demo's 762-line `useChallengeCurator.ts` hook with no real day-to-day fixture variation to navigate between — judged a risky refactor for no real benefit, so skipped. Documented here rather than silently done.
+- **Status badge:** the original implementation showed the challenge's draft/active/ended status prominently; the screenshot has no equivalent (demo challenges have no draft state). Caught during self-review as a real information-visibility regression, not just cosmetic — added back as a small badge next to the day eyebrow rather than left dropped.
+- **Mobile:** `CuratorPageShell`'s `wide` state is `useState(true)` initially (client-measured, so the very first server-rendered paint always assumes desktop width until JS hydrates and the `resize`/measurement effect runs) — a brief flash on narrow viewports, not a crash or broken layout. Not fixed further given time; worth a look during manual mobile QA.
+- **Compose CTA** in the tray bar renders genuinely disabled ("Compose", greyed, no arrow) — never a dead link, per the explicit instruction not to present unavailable stages as working.
+
+### Verification performed
+
+- `tsc --noEmit`: clean.
+- Full test suite: **200/200 passing** (no `lib/` changes this pass — day-picker/grace-period logic reuses existing, already-tested `lib/timezone.ts` functions directly rather than adding new ones).
+- Production build: ran cleanly (dev server on port 3002 stopped before the build, `.next` cleared, restarted fresh after — confirmed healthy, all touched routes 307-redirect to `/login` as expected rather than 500ing).
+- Landing page (`/`) confirmed still 200 and rendering after every demo-file refactor.
+- **What was NOT verified:** anything visual. No screenshot comparison, no click-through, no mobile-viewport check, no keyboard-navigation trace. The §8 QA checklist below is new and entirely unchecked.
+
+### Human browser-QA checklist (new, unchecked — do not treat any item as passed)
+
+- [ ] Challenges list and Curate page visually match the four supplied screenshots at a normal desktop width
+- [ ] Header day picker opens/closes correctly, shows the four day-states distinguishably, keyboard-navigable, Escape closes it, doesn't trap focus
+- [ ] Prev/next day arrows on Curate correctly skip pending/future days and land on the right available day
+- [ ] `?day=` persists across refresh and responds correctly to browser back/forward
+- [ ] Switching days updates gallery/counts/tabs/tray/lightbox atomically, no stale cross-day data, no leakage between days' selections
+- [ ] Rapid day switching (click several days quickly) doesn't produce a race/flicker of stale data
+- [ ] AvatarMenu opens/closes correctly (click, outside-click, Escape), sign-out still works
+- [ ] Settings page reachable from the header, same shell, form still saves correctly (unchanged `ChallengeForm` logic)
+- [ ] Mobile/narrow-viewport layout: header day-trigger/stepper correctly hide below 760px (matches the demo's own breakpoint), Curate's prev/next arrows and grid remain usable, no horizontal scroll/overflow
+- [ ] Landing-page demo (`/`) — both embedded preview and full-screen mode — still renders and behaves exactly as before this refactor (Challenges/Curate/Settings screens, lightbox, tray, stepper)
+- [ ] Lightbox keyboard nav (arrow keys, Escape) and the real eligibility checklist (mentionResult/dateEligible) display correctly for a genuine submission
+
+---
+
 ## Current work in progress — UX-A (2026-10-31)
 
 **Objective:** align the real organizer dashboard with the landing-page demo (`app/landing/curator/*`) and add daily-isolated curation with stable, capacity-bounded sampling. Full specification: **`docs/UX-A-IMPLEMENTATION.md`** (durable spec) — this section is the live operational status only; the spec doesn't change as work proceeds, this does.
