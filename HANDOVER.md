@@ -4,6 +4,18 @@
 
 ---
 
+## Marketing-site maintenance — signup email + footer copyright (2026-11-24)
+
+UX-A curation work (below) is **paused**, not resumed in this pass. Branch `feature/ux-a-curation` unchanged otherwise. Prompt: `prompts/grafeat-signup-email-footer-claude.md`.
+
+**Task B — dynamic footer copyright: done, code-complete.** New `app/landing/CopyrightYear.tsx` (client component, computes `new Date().getFullYear()` at render time, `suppressHydrationWarning` on that value — needed because the landing/legal pages are statically generated at build time, so a server-only year would freeze until the next deploy). `Footer.tsx`/`Footer.module.css` updated: existing row (logo, tagline, Privacy/Terms nav) untouched; a new second row holds `© {year} Brener Digital LLC`. Shared by `app/page.tsx` and `app/legal/LegalShell.tsx` (privacy/terms), so all three public pages got it from one change. Verified in both the production build's static HTML output and the dev server for `/`, `/privacy`, `/terms` — real current year (2026) renders correctly in all three. `tsc --noEmit` clean, 200/200 tests passing, `next build` clean.
+
+**Task A — early-signup email notifications: investigated, not touched.** Full pipeline traced (`EarlyAccessSection.tsx` → `app/api/early-access/route.ts` → `lib/early-access-handler.ts` → `lib/early-access.ts` → `lib/email.ts`). No code defect found — this code hasn't changed in a month (predates all UX-A work), all 19 existing tests pass, and the pipeline already distinguishes record-persisted from notification-sent (`notificationStatus`: `pending`/`sent`/`failed`) with structured failure logging. Two explanations remain, neither confirmable from this repo: (1) a Vercel production env var (`RESEND_API_KEY`/`MAGIC_LINK_FROM_EMAIL`/`EARLY_ACCESS_NOTIFY_EMAIL`) or Resend-account/domain issue, or (2) a duplicate-email resubmission, which is *silent by design* (same success response, no second notification) and would fully explain the symptom if testing reused the same email. **Per the user's direction, no code or test changes were made for Task A this pass** — they'll test with a genuinely new email first, then check Vercel runtime logs and Resend activity if it still doesn't arrive, before deciding whether any code change is actually warranted.
+
+**Changed files (Task B only):** `app/landing/CopyrightYear.tsx` (new), `app/landing/Footer.tsx`, `app/landing/Footer.module.css`. Nothing else touched — no UX-A files, no commit/push/deploy/env-var/migration actions taken.
+
+---
+
 ## Most recent work — UX-A Visual Parity + Day Navigation (2026-11-01)
 
 **Status: code-complete, `tsc`/tests/build all clean. No human browser QA has been performed — do not treat anything below as visually verified.** Prompt: `prompts/grafeat-ux-a-visual-parity-and-day-navigation-claude.md`.
